@@ -1,7 +1,7 @@
 name: Deploy Worker (dev)
 
 on:
-  push:
+  workflow_dispatch: {}
     branches: [ "main" ]
     paths:
       - "worker/**"
