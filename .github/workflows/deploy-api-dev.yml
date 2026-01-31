@@ -1,7 +1,7 @@
 name: Deploy API (dev)
 
 on:
-  push:
+  workflow_dispatch: {}
     branches: [ "main" ]
     paths:
       - "api/**"
