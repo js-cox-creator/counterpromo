@@ -2,10 +2,6 @@ name: Deploy API (dev)
 
 on:
   workflow_dispatch: {}
-    branches: [ "main" ]
-    paths:
-      - "api/**"
-      - ".github/workflows/deploy-api-dev.yml"
 
 permissions:
   id-token: write
