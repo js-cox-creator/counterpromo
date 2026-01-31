@@ -2,10 +2,6 @@ name: Deploy Worker (dev)
 
 on:
   workflow_dispatch: {}
-    branches: [ "main" ]
-    paths:
-      - "worker/**"
-      - ".github/workflows/deploy-worker-dev.yml"
 
 permissions:
   id-token: write
