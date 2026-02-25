@@ -1,7 +1,13 @@
 name: Deploy API (dev)
 
 on:
-  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - 'apps/api/**'
+      - 'packages/db/**'
+      - 'packages/shared/**'
+      - '.github/workflows/deploy-api-dev.yml'
 
 permissions:
   id-token: write
@@ -31,12 +37,11 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Build and push image
-        working-directory: api
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           ECR_URI="$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO"
           IMAGE_TAG="${GITHUB_SHA}"
-          docker build -t "$ECR_URI:$IMAGE_TAG" .
+          docker build -f apps/api/Dockerfile -t "$ECR_URI:$IMAGE_TAG" .
           docker push "$ECR_URI:$IMAGE_TAG"
           echo "ECR_URI=$ECR_URI" >> $GITHUB_ENV
           echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
