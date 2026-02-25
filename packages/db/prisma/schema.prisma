@@ -1,0 +1,247 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Billing & Plans ──────────────────────────────────────────────────────────
+
+enum BillingPlan {
+  free
+  starter
+  pro
+  dealer
+}
+
+// ─── Accounts ─────────────────────────────────────────────────────────────────
+
+model Account {
+  id              String      @id @default(cuid())
+  name            String
+  plan            BillingPlan @default(free)
+  stripeCustomerId String?    @unique
+  stripeSubId     String?     @unique
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  users     AccountUser[]
+  invites   Invite[]
+  brandKit  BrandKit?
+  promos    Promo[]
+  jobs      Job[]
+  assets    Asset[]
+  usage     UsageMonthly[]
+
+  @@map("accounts")
+}
+
+// ─── Users ────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  owner
+  admin
+  member
+}
+
+model AccountUser {
+  id        String   @id @default(cuid())
+  accountId String
+  clerkId   String
+  email     String
+  name      String?
+  role      UserRole @default(member)
+  createdAt DateTime @default(now())
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, clerkId])
+  @@unique([accountId, email])
+  @@map("account_users")
+}
+
+enum InviteStatus {
+  pending
+  accepted
+  expired
+}
+
+model Invite {
+  id        String       @id @default(cuid())
+  accountId String
+  email     String
+  role      UserRole     @default(member)
+  token     String       @unique @default(cuid())
+  status    InviteStatus @default(pending)
+  expiresAt DateTime
+  createdAt DateTime     @default(now())
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, email])
+  @@map("invites")
+}
+
+// ─── Brand Kit ────────────────────────────────────────────────────────────────
+
+model BrandKit {
+  id          String   @id @default(cuid())
+  accountId   String   @unique
+  logoUrl     String?
+  colors      Json     @default("[]") // string[] of hex values
+  fonts       Json     @default("[]") // string[]
+  defaultCta  String?
+  websiteUrl  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@map("brand_kits")
+}
+
+// ─── Promos ───────────────────────────────────────────────────────────────────
+
+enum PromoStatus {
+  draft
+  ready
+  archived
+}
+
+model Promo {
+  id          String      @id @default(cuid())
+  accountId   String
+  title       String
+  subhead     String?
+  cta         String?
+  templateId  String?
+  status      PromoStatus @default(draft)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  account Account     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  items   PromoItem[]
+  uploads Upload[]
+  jobs    Job[]
+  assets  Asset[]
+
+  @@map("promos")
+}
+
+model PromoItem {
+  id         String   @id @default(cuid())
+  promoId    String
+  sku        String?
+  name       String
+  price      Decimal  @db.Decimal(10, 2)
+  unit       String?
+  category   String?
+  vendor     String?
+  imageUrl   String?
+  sourceUrl  String?
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  promo Promo @relation(fields: [promoId], references: [id], onDelete: Cascade)
+
+  @@map("promo_items")
+}
+
+// ─── Uploads ──────────────────────────────────────────────────────────────────
+
+model Upload {
+  id         String   @id @default(cuid())
+  accountId  String
+  promoId    String
+  s3Key      String
+  filename   String
+  mimeType   String
+  sizeBytes  Int
+  parsedAt   DateTime?
+  createdAt  DateTime @default(now())
+
+  promo Promo @relation(fields: [promoId], references: [id], onDelete: Cascade)
+
+  @@map("uploads")
+}
+
+// ─── Jobs ─────────────────────────────────────────────────────────────────────
+
+enum JobType {
+  parse_upload
+  brand_bootstrap
+  product_url_scrape
+  render_preview
+  render_pdf
+  render_social_image
+  export_zip
+}
+
+enum JobStatus {
+  pending
+  running
+  done
+  failed
+}
+
+model Job {
+  id          String    @id @default(cuid())
+  accountId   String
+  promoId     String?
+  type        JobType
+  status      JobStatus @default(pending)
+  payload     Json
+  result      Json?
+  errorMsg    String?
+  attempts    Int       @default(0)
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  promo   Promo?  @relation(fields: [promoId], references: [id], onDelete: SetNull)
+
+  @@map("jobs")
+}
+
+// ─── Assets ───────────────────────────────────────────────────────────────────
+
+enum AssetType {
+  preview
+  pdf
+  social_image
+  email_html
+}
+
+model Asset {
+  id        String    @id @default(cuid())
+  accountId String
+  promoId   String
+  type      AssetType
+  s3Key     String
+  sizeBytes Int?
+  createdAt DateTime  @default(now())
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  promo   Promo   @relation(fields: [promoId], references: [id], onDelete: Cascade)
+
+  @@map("assets")
+}
+
+// ─── Usage ────────────────────────────────────────────────────────────────────
+
+model UsageMonthly {
+  id           String @id @default(cuid())
+  accountId    String
+  year         Int
+  month        Int    // 1-12
+  promosCount  Int    @default(0)
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, year, month])
+  @@map("usage_monthly")
+}

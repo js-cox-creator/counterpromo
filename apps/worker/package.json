@@ -1,0 +1,28 @@
+{
+  "name": "@counterpromo/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.997.0",
+    "@aws-sdk/client-sqs": "^3.701.0",
+    "@counterpromo/db": "*",
+    "@counterpromo/shared": "*",
+    "cheerio": "^1.2.0",
+    "dotenv": "^16.4.7",
+    "handlebars": "^4.7.8",
+    "playwright-core": "^1.58.2",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
