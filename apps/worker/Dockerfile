@@ -1,7 +1,5 @@
 FROM node:22-alpine AS base
-RUN apk add --no-cache libc6-compat openssl chromium nss freetype freetype-dev harfbuzz ca-certificates ttf-freefont
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
-ENV CHROMIUM_PATH=/usr/bin/chromium-browser
+RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
 
 # Install dependencies
@@ -20,10 +18,13 @@ RUN npm run db:generate --workspace=packages/db
 RUN npm run build --workspace=packages/db
 RUN npm run build --workspace=apps/worker
 
-# Runtime
-FROM base AS runner
-WORKDIR /app
+# Runtime — install Chromium only here (not needed at build time)
+FROM node:22-alpine AS runner
+RUN apk add --no-cache libc6-compat openssl chromium nss freetype harfbuzz ca-certificates ttf-freefont
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+ENV CHROMIUM_PATH=/usr/bin/chromium-browser
 ENV NODE_ENV=production
+WORKDIR /app
 
 COPY --from=builder /app/apps/worker/dist ./apps/worker/dist
 COPY --from=builder /app/packages/db/dist ./packages/db/dist
