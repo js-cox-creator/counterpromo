@@ -33,14 +33,15 @@ app.get('/health', async () => ({ status: 'ok', ts: new Date().toISOString() }))
 // Stripe webhooks — raw body required, no auth middleware
 await app.register(webhookRoutes, { prefix: '/webhooks' })
 
-// App routes
-await app.register(accountRoutes, { prefix: '/accounts' })
-await app.register(brandKitRoutes, { prefix: '/brand-kit' })
-await app.register(promoRoutes, { prefix: '/promos' })
-await app.register(jobRoutes, { prefix: '/jobs' })
-await app.register(billingRoutes, { prefix: '/billing' })
-await app.register(usageRoutes, { prefix: '/usage' })
-await app.register(userRoutes, { prefix: '/users' })
+// App routes — prefix with /api when behind ALB (set API_PREFIX=/api in ECS)
+const p = process.env.API_PREFIX ?? ''
+await app.register(accountRoutes, { prefix: `${p}/accounts` })
+await app.register(brandKitRoutes, { prefix: `${p}/brand-kit` })
+await app.register(promoRoutes, { prefix: `${p}/promos` })
+await app.register(jobRoutes, { prefix: `${p}/jobs` })
+await app.register(billingRoutes, { prefix: `${p}/billing` })
+await app.register(usageRoutes, { prefix: `${p}/usage` })
+await app.register(userRoutes, { prefix: `${p}/users` })
 
 const port = Number(process.env.PORT ?? 3001)
 const host = process.env.HOST ?? '0.0.0.0'
