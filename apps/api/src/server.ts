@@ -27,8 +27,11 @@ await app.register(cors, {
 // signature verification has access to the unmodified request body.
 await app.register(import('fastify-raw-body'), { field: 'rawBody', global: false, runFirst: true })
 
-// Health check (no auth)
+// Health check (no auth) — always at root; also at /api/health when behind ALB
 app.get('/health', async () => ({ status: 'ok', ts: new Date().toISOString() }))
+if (process.env.API_PREFIX) {
+  app.get(`${process.env.API_PREFIX}/health`, async () => ({ status: 'ok', ts: new Date().toISOString() }))
+}
 
 // Stripe webhooks — raw body required, no auth middleware
 await app.register(webhookRoutes, { prefix: '/webhooks' })
