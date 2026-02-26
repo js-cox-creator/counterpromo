@@ -1,5 +1,5 @@
 FROM node:22-alpine AS base
-RUN apk add --no-cache libc6-compat chromium nss freetype freetype-dev harfbuzz ca-certificates ttf-freefont
+RUN apk add --no-cache libc6-compat openssl chromium nss freetype freetype-dev harfbuzz ca-certificates ttf-freefont
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV CHROMIUM_PATH=/usr/bin/chromium-browser
 WORKDIR /app
@@ -34,5 +34,7 @@ COPY --from=builder /app/packages/db/package.json ./packages/db/
 COPY --from=builder /app/packages/shared/package.json ./packages/shared/
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/node_modules ./node_modules
+
+ENV PRISMA_QUERY_ENGINE_LIBRARY=/app/packages/db/generated/client/libquery_engine-linux-musl-openssl-3.0.x.so.node
 
 CMD ["node", "apps/worker/dist/index.js"]
