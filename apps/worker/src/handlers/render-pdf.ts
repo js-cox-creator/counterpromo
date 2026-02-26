@@ -24,7 +24,7 @@ export async function handleRenderPdf(payload: RenderPdfPayload): Promise<void> 
 
     const s3Key = `assets/${payload.accountId}/${payload.promoId}/pdf/${Date.now()}.pdf`
 
-    await uploadToS3(process.env.S3_ASSETS_BUCKET!, s3Key, pdfBuffer, 'application/pdf')
+    await uploadToS3((process.env.S3_ASSETS_BUCKET ?? process.env.ASSETS_BUCKET)!, s3Key, pdfBuffer, 'application/pdf')
 
     await prisma.asset.create({
       data: {

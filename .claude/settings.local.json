@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd:*)",
+      "Bash(node:*)",
+      "Bash(git init:*)",
+      "Bash(cd /Users/jamescox/Documents/counterpromo-v2/apps && npx create-next-app@latest web --typescript --tailwind --eslint --app --no-src-dir --import-alias \"@/*\" --no-turbopack 2>&1)",
+      "Bash(npx create-next-app@latest:*)",
+      "Bash(tail:*)",
+      "Bash(cd /Users/jamescox/Documents/counterpromo-v2/packages/db && npm install 2>&1 | tail -5 && npx prisma generate 2>&1)",
+      "Bash(chmod +x:*)",
+      "Bash(cd /Users/jamescox/Documents/counterpromo-v2 && bash scripts/dev-check.sh 2>&1)",
+      "Bash(bash:*)",
+      "Bash(npm run build --workspace=packages/shared 2>&1 && npm run build --workspace=packages/db 2>&1)",
+      "Bash(npm install:*)",
+      "Bash(npm show:*)",
+      "Bash(wc:*)",
+      "Bash(cat:*)",
+      "Bash(ls:*)",
+      "Bash(npx shadcn@latest:*)",
+      "Bash(npm run:*)",
+      "Bash(cd /Users/jamescox/Documents/counterpromo-v2/apps/worker && npx tsc --noEmit 2>&1)",
+      "Bash(cd /Users/jamescox/Documents/counterpromo-v2/apps/api && npx tsc --noEmit 2>&1)",
+      "Bash(cd /Users/jamescox/Documents/counterpromo-v2/apps/web && npx tsc --noEmit 2>&1)",
+      "Bash(git remote:*)",
+      "Bash(git add:*)",
+      "Bash(git push:*)",
+      "Bash(git fetch origin 2>&1 && git log --oneline origin/main 2>&1)",
+      "Bash(git merge:*)",
+      "Bash(aws ecs:*)",
+      "Bash(aws ecs describe-task-definition --task-definition counterpromo-dev-td-api --region eu-west-2 --query taskDefinition | python3 -c \"\nimport json, sys\ntd = json.load\\(sys.stdin\\)\nfor k in ['taskDefinitionArn','revision','status','requiresAttributes','compatibilities','registeredAt','registeredBy']:\n    td.pop\\(k, None\\)\ntd['containerDefinitions'][0]['environment'] += [\n    {'name': 'PORT', 'value': '3000'},\n    {'name': 'API_PREFIX', 'value': '/api'},\n    {'name': 'APP_URL', 'value': 'https://dev.counterpromo.com'},\n    {'name': 'CORS_ORIGIN', 'value': 'https://dev.counterpromo.com'},\n    {'name': 'NODE_ENV', 'value': 'production'},\n]\nprint\\(json.dumps\\(td\\)\\)\n\" | aws ecs register-task-definition --region eu-west-2 --cli-input-json file:///dev/stdin --query 'taskDefinition.taskDefinitionArn' --output text 2>&1)",
+      "Bash(npm run build --workspace=packages/shared && npm run build --workspace=packages/db && npx tsc --noEmit --project apps/api/tsconfig.json 2>&1 && npx tsc --noEmit --project apps/worker/tsconfig.json 2>&1)"
+    ]
+  }
+}

@@ -16,7 +16,7 @@ permissions:
 env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
   CLUSTER: counterpromo-dev-cluster
-  SERVICE: counterpromo-dev-svc-api
+  SERVICE: counterpromo-dev-td-api-service-14ngyomh
   TASK_FAMILY: counterpromo-dev-td-api
   ECR_REPO: counterpromo-dev-api
 

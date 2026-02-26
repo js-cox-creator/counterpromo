@@ -24,7 +24,7 @@ export async function handleRenderPreview(payload: RenderPreviewPayload): Promis
 
     const s3Key = `assets/${payload.accountId}/${payload.promoId}/preview/${Date.now()}.png`
 
-    await uploadToS3(process.env.S3_ASSETS_BUCKET!, s3Key, pngBuffer, 'image/png')
+    await uploadToS3((process.env.S3_ASSETS_BUCKET ?? process.env.ASSETS_BUCKET)!, s3Key, pngBuffer, 'image/png')
 
     await prisma.asset.create({
       data: {

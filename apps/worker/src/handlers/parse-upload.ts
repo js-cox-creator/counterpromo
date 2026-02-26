@@ -16,7 +16,7 @@ export async function handleParseUpload(payload: ParseUploadPayload): Promise<vo
 
   try {
     // Download file from S3
-    const buffer = await downloadFromS3(process.env.S3_UPLOADS_BUCKET!, payload.s3Key)
+    const buffer = await downloadFromS3((process.env.S3_UPLOADS_BUCKET ?? process.env.UPLOADS_BUCKET)!, payload.s3Key)
 
     // Parse workbook
     const workbook = XLSX.read(buffer, { type: 'buffer' })
