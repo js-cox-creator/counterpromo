@@ -27,6 +27,16 @@ export default function BrandKitPage() {
     },
   })
 
+  const { data: accountData } = useQuery({
+    queryKey: ['account'],
+    queryFn: async () => {
+      const token = await getToken()
+      return apiClient(token!).accounts.me()
+    },
+  })
+
+  const isMember = accountData?.data?.currentUser?.role === 'member'
+
   const brandKit = brandKitData?.data
 
   // Editable form state — seeded from query data
@@ -188,9 +198,15 @@ export default function BrandKitPage() {
                   </p>
                 )}
 
-                <Button type="submit" disabled={saveLoading}>
-                  {saveLoading ? 'Saving…' : 'Save changes'}
-                </Button>
+                {isMember ? (
+                  <p className="text-sm text-amber-700 bg-amber-50 px-3 py-2 rounded-md">
+                    Only account owners and admins can update the brand kit.
+                  </p>
+                ) : (
+                  <Button type="submit" disabled={saveLoading}>
+                    {saveLoading ? 'Saving…' : 'Save changes'}
+                  </Button>
+                )}
               </form>
             </CardContent>
           </Card>

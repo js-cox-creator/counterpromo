@@ -3,11 +3,15 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { UserButton } from '@clerk/nextjs'
-import { LayoutDashboard, Palette, CreditCard } from 'lucide-react'
+import { LayoutDashboard, Palette, CreditCard, GitBranch, FileSpreadsheet, Users, Bookmark } from 'lucide-react'
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/brand-kit', label: 'Brand Kit', icon: Palette },
+  { href: '/branches', label: 'Branches', icon: GitBranch },
+  { href: '/import-mappings', label: 'Import Mappings', icon: FileSpreadsheet },
+  { href: '/snippets', label: 'Snippets', icon: Bookmark },
+  { href: '/team', label: 'Team', icon: Users },
   { href: '/billing', label: 'Billing', icon: CreditCard },
 ]
 

@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{{promo.title}}</title>
+  <style>
+    @page { size: letter; margin: 0; }
+
+    html, body {
+      width: 8.5in;
+      height: 11in;
+      margin: 0;
+      padding: 0;
+      font-family: Georgia, 'Times New Roman', serif;
+      box-sizing: border-box;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    .page {
+      width: 8.5in;
+      height: 11in;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: #fff;
+    }
+
+    /* Header */
+    .header {
+      background: {{brand.primaryColor}};
+      padding: 18px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    .header-logo { height: 44px; width: auto; object-fit: contain; }
+    .header-company { color: #fff; font-size: 22px; font-weight: 700; }
+    .header-tag {
+      color: #fff;
+      font-size: 13px;
+      font-style: italic;
+      opacity: 0.85;
+      text-align: right;
+    }
+
+    /* Banner */
+    .banner {
+      background: {{brand.secondaryColor}};
+      padding: 14px 32px;
+      flex-shrink: 0;
+    }
+
+    .banner-title {
+      font-size: 32px;
+      font-weight: 900;
+      color: #fff;
+      margin: 0 0 2px 0;
+      font-family: Arial, sans-serif;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .banner-sub {
+      font-size: 15px;
+      color: rgba(255,255,255,0.9);
+      margin: 0;
+      font-family: Arial, sans-serif;
+    }
+
+    /* Items list */
+    .items-section {
+      flex: 1;
+      padding: 16px 32px;
+      overflow: hidden;
+    }
+
+    .item-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      border-bottom: 1px dotted #ccc;
+      padding: 10px 0;
+    }
+
+    .item-row:last-child { border-bottom: none; }
+
+    .item-name {
+      font-size: 15px;
+      font-weight: 700;
+      color: #1a1a1a;
+      flex: 1;
+    }
+
+    .item-meta {
+      font-size: 12px;
+      color: #888;
+      margin: 0 16px;
+      white-space: nowrap;
+    }
+
+    .item-price {
+      font-size: 20px;
+      font-weight: 900;
+      color: {{brand.secondaryColor}};
+      white-space: nowrap;
+      font-family: Arial, sans-serif;
+    }
+
+    /* Footer */
+    .footer {
+      background: {{brand.primaryColor}};
+      padding: 14px 32px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    .footer-cta {
+      color: #fff;
+      font-size: 17px;
+      font-weight: 700;
+      margin: 0;
+      font-family: Arial, sans-serif;
+      letter-spacing: 0.5px;
+    }
+
+    /* Watermark */
+    .watermark {
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%) rotate(-45deg);
+      font-size: 80px;
+      color: rgba(0,0,0,0.07);
+      font-weight: 900;
+      pointer-events: none;
+      white-space: nowrap;
+      z-index: 999;
+      font-family: Arial, sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+
+    <!-- Header -->
+    <div class="header">
+      <div style="display:flex;align-items:center;gap:12px;">
+        {{#if brand.logoUrl}}
+          <img class="header-logo" src="{{brand.logoUrl}}" alt="{{brand.name}}">
+        {{else}}
+          <span class="header-company">{{brand.name}}</span>
+        {{/if}}
+      </div>
+      <div class="header-tag">{{brand.name}}<br>Monthly Specials</div>
+    </div>
+
+    <!-- Banner -->
+    <div class="banner">
+      <p class="banner-title">{{promo.title}}</p>
+      {{#if promo.subhead}}
+        <p class="banner-sub">{{promo.subhead}}</p>
+      {{/if}}
+    </div>
+
+    <!-- Items list -->
+    <div class="items-section">
+      {{#each items}}
+        <div class="item-row">
+          <span class="item-name">{{name}}</span>
+          {{#if sku}}<span class="item-meta">SKU: {{sku}}</span>{{/if}}
+          {{#if unit}}<span class="item-meta">/ {{unit}}</span>{{/if}}
+          <span class="item-price">{{price}}</span>
+        </div>
+      {{/each}}
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <p class="footer-cta">
+        {{#if promo.cta}}{{promo.cta}}{{else}}Visit us in-store today{{/if}}
+      </p>
+    </div>
+
+  </div>
+
+  {{#if watermark}}
+    <div class="watermark">PREVIEW ONLY</div>
+  {{/if}}
+</body>
+</html>

@@ -7,6 +7,10 @@ import { handleBrandBootstrap } from './handlers/brand-bootstrap.js'
 import { handleProductUrlScrape } from './handlers/product-url-scrape.js'
 import { handleRenderPreview } from './handlers/render-preview.js'
 import { handleRenderPdf } from './handlers/render-pdf.js'
+import { handleRenderSocialImage } from './handlers/render-social-image.js'
+import { handleExportZip } from './handlers/export-zip.js'
+import { handleRenderEmail } from './handlers/render-email.js'
+import { handleGenerateCoopReport } from './handlers/generate-coop-report.js'
 
 const sqs = new SQSClient({ region: process.env.AWS_REGION ?? 'eu-west-2' })
 const QUEUE_URL = process.env.JOBS_QUEUE_URL!
@@ -23,6 +27,14 @@ async function processMessage(payload: JobPayload): Promise<void> {
       return handleRenderPreview(payload)
     case JobType.RenderPdf:
       return handleRenderPdf(payload)
+    case JobType.RenderSocialImage:
+      return handleRenderSocialImage(payload)
+    case JobType.ExportZip:
+      return handleExportZip(payload)
+    case JobType.GenerateEmail:
+      return handleRenderEmail(payload)
+    case JobType.GenerateCoopReport:
+      return handleGenerateCoopReport(payload)
     default:
       console.warn('Unknown job type:', (payload as JobPayload).type)
   }

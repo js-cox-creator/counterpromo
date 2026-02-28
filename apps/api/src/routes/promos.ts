@@ -40,13 +40,30 @@ const UploadBody = z.object({
 
 export async function promoRoutes(app: FastifyInstance) {
   // GET /promos — list promos for account (exclude archived), with item count
+  // Optional query: ?folderId=<id>  or  ?folderId=unfiled  (promos with no folder)
   app.get('/', { preHandler: requireAuth }, async (request, reply) => {
     const { accountId } = request.auth
+    const query = request.query as { folderId?: string }
+
+    let folderFilter: { folderId: string | null } | Record<string, never> = {}
+    if (query.folderId === 'unfiled') {
+      folderFilter = { folderId: null }
+    } else if (query.folderId) {
+      folderFilter = { folderId: query.folderId }
+    }
+
+    // Branch managers only see promos for their assigned branch
+    const branchFilter =
+      request.auth.role === 'branch_manager' && request.auth.branchId
+        ? { branchId: request.auth.branchId }
+        : {}
 
     const promos = await prisma.promo.findMany({
       where: {
         accountId,
         status: { not: 'archived' },
+        ...folderFilter,
+        ...branchFilter,
       },
       include: {
         _count: { select: { items: true } },
@@ -134,6 +151,7 @@ export async function promoRoutes(app: FastifyInstance) {
       subhead?: string | null
       cta?: string | null
       templateId?: string | null
+      folderId?: string | null
     }
 
     const promo = await prisma.promo.findFirst({
@@ -152,6 +170,7 @@ export async function promoRoutes(app: FastifyInstance) {
         ...(body.subhead !== undefined ? { subhead: body.subhead } : {}),
         ...(body.cta !== undefined ? { cta: body.cta } : {}),
         ...(body.templateId !== undefined ? { templateId: body.templateId } : {}),
+        ...(body.folderId !== undefined ? { folderId: body.folderId } : {}),
       },
     })
 
@@ -378,7 +397,7 @@ export async function promoRoutes(app: FastifyInstance) {
     const { accountId } = request.auth
     const { id: promoId } = request.params as { id: string }
 
-    const body = request.body as { uploadId?: string; s3Key?: string }
+    const body = request.body as { uploadId?: string; s3Key?: string; mappingId?: string }
     if (!body.uploadId || !body.s3Key) {
       return reply.status(400).send({ error: 'uploadId and s3Key are required' })
     }
@@ -398,7 +417,11 @@ export async function promoRoutes(app: FastifyInstance) {
         promoId,
         type: 'parse_upload',
         status: 'pending',
-        payload: { uploadId: body.uploadId, s3Key: body.s3Key },
+        payload: {
+          uploadId: body.uploadId,
+          s3Key: body.s3Key,
+          ...(body.mappingId ? { mappingId: body.mappingId } : {}),
+        },
       },
     })
 
@@ -409,6 +432,7 @@ export async function promoRoutes(app: FastifyInstance) {
       promoId,
       uploadId: body.uploadId,
       s3Key: body.s3Key,
+      ...(body.mappingId ? { mappingId: body.mappingId } : {}),
     })
 
     return reply.status(202).send({ jobId: job.id })
@@ -440,8 +464,8 @@ export async function promoRoutes(app: FastifyInstance) {
     const plan = account.plan as BillingPlan
     const watermark = PLAN_LIMITS[plan].watermark
 
-    // Create both Job records
-    const [previewJob, pdfJob] = await prisma.$transaction([
+    // Create all three Job records
+    const [previewJob, pdfJob, socialJob] = await prisma.$transaction([
       prisma.job.create({
         data: {
           accountId,
@@ -460,9 +484,18 @@ export async function promoRoutes(app: FastifyInstance) {
           payload: { promoId, watermark },
         },
       }),
+      prisma.job.create({
+        data: {
+          accountId,
+          promoId,
+          type: 'render_social_image',
+          status: 'pending',
+          payload: { promoId, watermark },
+        },
+      }),
     ])
 
-    // Enqueue both jobs to SQS
+    // Enqueue all three jobs to SQS
     await Promise.all([
       enqueueJob({
         type: JobType.RenderPreview,
@@ -477,12 +510,20 @@ export async function promoRoutes(app: FastifyInstance) {
         promoId,
         watermark,
       }),
+      enqueueJob({
+        type: JobType.RenderSocialImage,
+        jobId: socialJob.id,
+        accountId,
+        promoId,
+        watermark,
+      }),
     ])
 
     return reply.status(202).send({
       jobs: [
         { jobId: previewJob.id, type: 'render_preview' },
         { jobId: pdfJob.id, type: 'render_pdf' },
+        { jobId: socialJob.id, type: 'render_social_image' },
       ],
     })
   })
@@ -515,6 +556,223 @@ export async function promoRoutes(app: FastifyInstance) {
     return reply.status(200).send({ ok: true })
   })
 
+  // POST /promos/:id/export-zip — enqueue ExportZip job
+  app.post('/:id/export-zip', { preHandler: requireAuth }, async (request, reply) => {
+    const { accountId } = request.auth
+    const { id: promoId } = request.params as { id: string }
+
+    const promo = await prisma.promo.findFirst({
+      where: { id: promoId, accountId },
+      select: { id: true },
+    })
+
+    if (!promo) {
+      return reply.status(404).send({ error: 'Promo not found' })
+    }
+
+    const job = await prisma.job.create({
+      data: {
+        accountId,
+        promoId,
+        type: 'export_zip',
+        status: 'pending',
+        payload: { promoId },
+      },
+    })
+
+    await enqueueJob({
+      type: JobType.ExportZip,
+      jobId: job.id,
+      accountId,
+      promoId,
+    })
+
+    return reply.status(202).send({ jobId: job.id })
+  })
+
+  // POST /promos/:id/render-email — enqueue GenerateEmail job
+  app.post('/:id/render-email', { preHandler: requireAuth }, async (request, reply) => {
+    const { accountId } = request.auth
+    const { id: promoId } = request.params as { id: string }
+
+    const promo = await prisma.promo.findFirst({
+      where: { id: promoId, accountId },
+      select: { id: true },
+    })
+
+    if (!promo) {
+      return reply.status(404).send({ error: 'Promo not found' })
+    }
+
+    const job = await prisma.job.create({
+      data: {
+        accountId,
+        promoId,
+        type: 'generate_email',
+        status: 'pending',
+        payload: { promoId },
+      },
+    })
+
+    await enqueueJob({
+      type: JobType.GenerateEmail,
+      jobId: job.id,
+      accountId,
+      promoId,
+    })
+
+    return reply.status(202).send({ jobId: job.id })
+  })
+
+  // POST /promos/:id/items/from-snippet — add a PromoItem from a saved ProductSnippet
+  app.post('/:id/items/from-snippet', { preHandler: requireAuth }, async (request, reply) => {
+    const { accountId } = request.auth
+    const { id: promoId } = request.params as { id: string }
+
+    const body = request.body as { snippetId?: string }
+    if (!body.snippetId) {
+      return reply.status(400).send({ error: 'snippetId is required' })
+    }
+
+    const promo = await prisma.promo.findFirst({
+      where: { id: promoId, accountId },
+      select: { id: true },
+    })
+
+    if (!promo) {
+      return reply.status(404).send({ error: 'Promo not found' })
+    }
+
+    const snippet = await prisma.productSnippet.findFirst({
+      where: { id: body.snippetId, accountId },
+    })
+
+    if (!snippet) {
+      return reply.status(404).send({ error: 'Snippet not found' })
+    }
+
+    // Append after the last existing item
+    const maxItem = await prisma.promoItem.findFirst({
+      where: { promoId },
+      orderBy: { sortOrder: 'desc' },
+      select: { sortOrder: true },
+    })
+    const newSortOrder = (maxItem?.sortOrder ?? -1) + 1
+
+    const item = await prisma.promoItem.create({
+      data: {
+        promoId,
+        name: snippet.name,
+        price: snippet.price,
+        sku: snippet.sku,
+        unit: snippet.unit,
+        category: snippet.category,
+        vendor: snippet.vendor,
+        imageUrl: snippet.imageUrl,
+        sourceUrl: snippet.sourceUrl,
+        sortOrder: newSortOrder,
+      },
+    })
+
+    return reply.status(201).send(item)
+  })
+
+  // POST /promos/:id/render-branch-pack — enqueue render jobs for every branch
+  app.post('/:id/render-branch-pack', { preHandler: requireAuth }, async (request, reply) => {
+    const { accountId } = request.auth
+    const { id: promoId } = request.params as { id: string }
+
+    const promo = await prisma.promo.findFirst({
+      where: { id: promoId, accountId },
+      select: { id: true },
+    })
+
+    if (!promo) {
+      return reply.status(404).send({ error: 'Promo not found' })
+    }
+
+    const branches = await prisma.branch.findMany({
+      where: { accountId },
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+    })
+
+    if (branches.length === 0) {
+      return reply.status(400).send({ error: 'No branches found for this account' })
+    }
+
+    const account = await prisma.account.findUnique({
+      where: { id: accountId },
+      select: { plan: true },
+    })
+    const plan = (account?.plan ?? 'free') as BillingPlan
+    const watermark = PLAN_LIMITS[plan].watermark
+
+    // For each branch, create 4 jobs: preview, pdf, social, email
+    const result = await Promise.all(
+      branches.map(async (branch) => {
+        const [previewJob, pdfJob, socialJob, emailJob] = await prisma.$transaction([
+          prisma.job.create({
+            data: {
+              accountId,
+              promoId,
+              type: 'render_preview',
+              status: 'pending',
+              payload: { promoId, branchId: branch.id, branchName: branch.name },
+            },
+          }),
+          prisma.job.create({
+            data: {
+              accountId,
+              promoId,
+              type: 'render_pdf',
+              status: 'pending',
+              payload: { promoId, watermark, branchId: branch.id, branchName: branch.name },
+            },
+          }),
+          prisma.job.create({
+            data: {
+              accountId,
+              promoId,
+              type: 'render_social_image',
+              status: 'pending',
+              payload: { promoId, watermark, branchId: branch.id, branchName: branch.name },
+            },
+          }),
+          prisma.job.create({
+            data: {
+              accountId,
+              promoId,
+              type: 'generate_email',
+              status: 'pending',
+              payload: { promoId, branchId: branch.id, branchName: branch.name },
+            },
+          }),
+        ])
+
+        await Promise.all([
+          enqueueJob({ type: JobType.RenderPreview, jobId: previewJob.id, accountId, promoId, branchId: branch.id, branchName: branch.name }),
+          enqueueJob({ type: JobType.RenderPdf, jobId: pdfJob.id, accountId, promoId, watermark, branchId: branch.id, branchName: branch.name }),
+          enqueueJob({ type: JobType.RenderSocialImage, jobId: socialJob.id, accountId, promoId, watermark, branchId: branch.id, branchName: branch.name }),
+          enqueueJob({ type: JobType.GenerateEmail, jobId: emailJob.id, accountId, promoId, branchId: branch.id, branchName: branch.name }),
+        ])
+
+        return {
+          branchId: branch.id,
+          branchName: branch.name,
+          jobs: {
+            preview: previewJob.id,
+            pdf: pdfJob.id,
+            social: socialJob.id,
+            email: emailJob.id,
+          },
+        }
+      }),
+    )
+
+    return reply.status(202).send({ branches: result })
+  })
+
   // GET /promos/:id/assets — list assets with signed S3 URLs
   app.get('/:id/assets', { preHandler: requireAuth }, async (request, reply) => {
     const { accountId } = request.auth
@@ -536,6 +794,7 @@ export async function promoRoutes(app: FastifyInstance) {
         id: true,
         type: true,
         s3Key: true,
+        branchId: true,
         createdAt: true,
       },
     })
@@ -544,6 +803,7 @@ export async function promoRoutes(app: FastifyInstance) {
       assets.map(async (asset) => ({
         id: asset.id,
         type: asset.type,
+        branchId: asset.branchId,
         url: await getAssetSignedUrl(asset.s3Key),
         createdAt: asset.createdAt,
       })),

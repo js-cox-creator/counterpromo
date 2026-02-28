@@ -10,7 +10,7 @@ export async function handleRenderPreview(payload: RenderPreviewPayload): Promis
   try {
     await startJob(payload.jobId)
 
-    const data = await loadTemplateData(payload.promoId, payload.accountId, false)
+    const data = await loadTemplateData(payload.promoId, payload.accountId, false, payload.branchId)
 
     const promo = await prisma.promo.findUnique({
       where: { id: payload.promoId },
@@ -22,7 +22,8 @@ export async function handleRenderPreview(payload: RenderPreviewPayload): Promis
 
     const pngBuffer = await renderHtmlToScreenshot(html)
 
-    const s3Key = `assets/${payload.accountId}/${payload.promoId}/preview/${Date.now()}.png`
+    const branchSegment = payload.branchId ? `branches/${payload.branchId}/` : ''
+    const s3Key = `assets/${payload.accountId}/${payload.promoId}/${branchSegment}preview/${Date.now()}.png`
 
     await uploadToS3((process.env.S3_ASSETS_BUCKET ?? process.env.ASSETS_BUCKET)!, s3Key, pngBuffer, 'image/png')
 
@@ -30,6 +31,7 @@ export async function handleRenderPreview(payload: RenderPreviewPayload): Promis
       data: {
         accountId: payload.accountId,
         promoId: payload.promoId,
+        branchId: payload.branchId ?? null,
         type: 'preview',
         s3Key,
         sizeBytes: pngBuffer.length,

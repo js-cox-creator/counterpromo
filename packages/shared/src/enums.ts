@@ -9,7 +9,8 @@ export enum UserRole {
   Owner = 'owner',
   Admin = 'admin',
   Member = 'member',
-  BranchManager = 'branch_manager', // Phase 3
+  Marketing = 'marketing',
+  BranchManager = 'branch_manager',
 }
 
 export enum JobType {
@@ -20,6 +21,8 @@ export enum JobType {
   RenderPdf = 'render_pdf',
   RenderSocialImage = 'render_social_image', // Phase 2
   ExportZip = 'export_zip', // Phase 2
+  GenerateEmail = 'generate_email',
+  GenerateCoopReport = 'generate_coop_report',
 }
 
 export enum JobStatus {
@@ -34,6 +37,9 @@ export enum AssetType {
   Pdf = 'pdf',
   SocialImage = 'social_image', // Phase 2
   EmailHtml = 'email_html',     // Phase 2
+  Zip = 'zip',
+  SocialCaptions = 'social_captions',
+  CoopReport = 'coop_report',
 }
 
 export enum PromoStatus {

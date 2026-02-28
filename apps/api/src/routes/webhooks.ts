@@ -104,11 +104,26 @@ export async function webhookRoutes(app: FastifyInstance) {
               break
             }
 
+            // Resolve the plan immediately from the subscription so the account
+            // is updated in a single write rather than waiting for a separate
+            // customer.subscription.updated event (which may not arrive locally).
+            let plan: BillingPlan = BillingPlan.Free
+            if (stripeSubId) {
+              try {
+                const subscription = await stripe.subscriptions.retrieve(stripeSubId)
+                const priceId = subscription.items.data[0]?.price?.id
+                if (priceId) plan = stripePriceToPlan(priceId)
+              } catch (err) {
+                app.log.warn({ err, stripeSubId }, 'Could not retrieve subscription to resolve plan')
+              }
+            }
+
             await prisma.account.update({
               where: { id: accountId },
               data: {
                 ...(stripeCustomerId ? { stripeCustomerId } : {}),
                 ...(stripeSubId ? { stripeSubId } : {}),
+                plan,
               },
             })
             break

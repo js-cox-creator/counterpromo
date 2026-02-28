@@ -78,13 +78,15 @@ export default function BillingPage() {
   const account = accountData?.data
   const usage = usageData?.data
   const currentPlan = account?.plan ?? 'free'
+  const isMember = account?.currentUser?.role === 'member'
 
   async function handleUpgrade(plan: (typeof PLANS)[number]) {
     if (!plan.priceId) return
     setLoadingPlan(plan.id)
     try {
       const token = await getToken()
-      const { data } = await apiClient(token!).billing.checkout(plan.priceId)
+      if (!token) throw new Error('Session expired — please refresh and try again')
+      const { data } = await apiClient(token).billing.checkout(plan.priceId)
       window.location.href = data.url
     } catch (err) {
       console.error('Checkout error', err)
@@ -133,6 +135,12 @@ export default function BillingPage() {
         )}
       </div>
 
+      {isMember && (
+        <div className="mb-6 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+          Billing is managed by your account owner or admin. Contact them to change your plan.
+        </div>
+      )}
+
       {/* Plan cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {PLANS.map((plan) => {
@@ -167,22 +175,28 @@ export default function BillingPage() {
                     </li>
                   ))}
                 </ul>
-                <div title={missingPriceId && !isCurrent ? 'Coming soon' : undefined}>
-                  <Button
-                    className="w-full"
-                    variant={isCurrent ? 'outline' : 'default'}
-                    disabled={isCurrent || missingPriceId || loadingPlan !== null}
-                    onClick={() => handleUpgrade(plan)}
-                  >
-                    {loadingPlan === plan.id
-                      ? 'Redirecting...'
-                      : isCurrent
-                        ? 'Current plan'
-                        : missingPriceId
-                          ? 'Coming soon'
-                          : plan.cta}
+                {isMember ? (
+                  <Button className="w-full" variant="outline" disabled>
+                    {isCurrent ? 'Current plan' : plan.cta}
                   </Button>
-                </div>
+                ) : (
+                  <div title={missingPriceId && !isCurrent ? 'Coming soon' : undefined}>
+                    <Button
+                      className="w-full"
+                      variant={isCurrent ? 'outline' : 'default'}
+                      disabled={isCurrent || missingPriceId || loadingPlan !== null}
+                      onClick={() => handleUpgrade(plan)}
+                    >
+                      {loadingPlan === plan.id
+                        ? 'Redirecting...'
+                        : isCurrent
+                          ? 'Current plan'
+                          : missingPriceId
+                            ? 'Coming soon'
+                            : plan.cta}
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )

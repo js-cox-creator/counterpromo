@@ -29,13 +29,17 @@ model Account {
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
-  users     AccountUser[]
-  invites   Invite[]
-  brandKit  BrandKit?
-  promos    Promo[]
-  jobs      Job[]
-  assets    Asset[]
-  usage     UsageMonthly[]
+  users          AccountUser[]
+  invites        Invite[]
+  brandKit       BrandKit?
+  promos         Promo[]
+  folders        PromoFolder[]
+  jobs           Job[]
+  assets         Asset[]
+  usage          UsageMonthly[]
+  branches       Branch[]
+  importMappings ImportMapping[]
+  snippets       ProductSnippet[]
 
   @@map("accounts")
 }
@@ -46,6 +50,8 @@ enum UserRole {
   owner
   admin
   member
+  marketing
+  branch_manager
 }
 
 model AccountUser {
@@ -55,9 +61,11 @@ model AccountUser {
   email     String
   name      String?
   role      UserRole @default(member)
+  branchId  String?
   createdAt DateTime @default(now())
 
-  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  account Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  branch  Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
 
   @@unique([accountId, clerkId])
   @@unique([accountId, email])
@@ -112,9 +120,24 @@ enum PromoStatus {
   archived
 }
 
+model PromoFolder {
+  id        String   @id @default(cuid())
+  accountId String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  promos  Promo[]
+
+  @@map("promo_folders")
+}
+
 model Promo {
   id          String      @id @default(cuid())
   accountId   String
+  branchId    String?
+  folderId    String?
   title       String
   subhead     String?
   cta         String?
@@ -123,7 +146,9 @@ model Promo {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  account Account     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  account Account      @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  branch  Branch?      @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  folder  PromoFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
   items   PromoItem[]
   uploads Upload[]
   jobs    Job[]
@@ -133,18 +158,21 @@ model Promo {
 }
 
 model PromoItem {
-  id         String   @id @default(cuid())
-  promoId    String
-  sku        String?
-  name       String
-  price      Decimal  @db.Decimal(10, 2)
-  unit       String?
-  category   String?
-  vendor     String?
-  imageUrl   String?
-  sourceUrl  String?
-  sortOrder  Int      @default(0)
-  createdAt  DateTime @default(now())
+  id          String   @id @default(cuid())
+  promoId     String
+  sku         String?
+  name        String
+  price       Decimal  @db.Decimal(10, 2)
+  unit        String?
+  category    String?
+  vendor      String?
+  imageUrl    String?
+  sourceUrl   String?
+  sortOrder   Int      @default(0)
+  coopVendor  String?
+  coopAmount  Decimal? @db.Decimal(10, 2)
+  coopNote    String?
+  createdAt   DateTime @default(now())
 
   promo Promo @relation(fields: [promoId], references: [id], onDelete: Cascade)
 
@@ -169,6 +197,63 @@ model Upload {
   @@map("uploads")
 }
 
+// ─── Branches ────────────────────────────────────────────────────────────────
+
+model Branch {
+  id        String   @id @default(cuid())
+  accountId String
+  name      String
+  address   String?
+  phone     String?
+  email     String?
+  cta       String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  account Account       @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  users   AccountUser[]
+  promos  Promo[]
+  assets  Asset[]
+
+  @@map("branches")
+}
+
+// ─── Import Mappings ──────────────────────────────────────────────────────────
+
+model ImportMapping {
+  id        String   @id @default(cuid())
+  accountId String
+  name      String
+  mappings  Json     // { name?: string, price?: string, sku?: string, unit?: string, category?: string, vendor?: string }
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@map("import_mappings")
+}
+
+// ─── Product Snippets ─────────────────────────────────────────────────────────
+
+model ProductSnippet {
+  id        String   @id @default(cuid())
+  accountId String
+  name      String
+  price     Decimal  @db.Decimal(10, 2)
+  sku       String?
+  unit      String?
+  category  String?
+  vendor    String?
+  imageUrl  String?
+  sourceUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@map("product_snippets")
+}
+
 // ─── Jobs ─────────────────────────────────────────────────────────────────────
 
 enum JobType {
@@ -179,6 +264,8 @@ enum JobType {
   render_pdf
   render_social_image
   export_zip
+  generate_email
+  generate_coop_report
 }
 
 enum JobStatus {
@@ -215,19 +302,24 @@ enum AssetType {
   pdf
   social_image
   email_html
+  zip
+  social_captions
+  coop_report
 }
 
 model Asset {
   id        String    @id @default(cuid())
   accountId String
   promoId   String
+  branchId  String?
   type      AssetType
   s3Key     String
   sizeBytes Int?
   createdAt DateTime  @default(now())
 
-  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  promo   Promo   @relation(fields: [promoId], references: [id], onDelete: Cascade)
+  account Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  promo   Promo    @relation(fields: [promoId], references: [id], onDelete: Cascade)
+  branch  Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
 
   @@map("assets")
 }

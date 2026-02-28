@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { prisma } from '@counterpromo/db'
 import { JobType } from '@counterpromo/shared'
-import { requireAuth } from '../middleware/auth.js'
+import { requireAuth, requireRole } from '../middleware/auth.js'
 import { enqueueJob } from '../lib/sqs.js'
 
 const UpsertBrandKitBody = z.object({
@@ -29,8 +29,8 @@ export async function brandKitRoutes(app: FastifyInstance) {
     return reply.send(brandKit)
   })
 
-  // POST /brand-kit — upsert brand kit
-  app.post('/', { preHandler: requireAuth }, async (request, reply) => {
+  // POST /brand-kit — upsert brand kit (owner/admin only)
+  app.post('/', { preHandler: [requireAuth, requireRole('owner', 'admin')] }, async (request, reply) => {
     const parsed = UpsertBrandKitBody.safeParse(request.body)
     if (!parsed.success) {
       return reply.status(400).send({ error: parsed.error.errors[0]?.message ?? 'Invalid body' })

@@ -12,6 +12,7 @@ export async function loadTemplateData(
   promoId: string,
   accountId: string,
   watermark: boolean,
+  branchId?: string,
 ): Promise<TemplatePromoData> {
   const [promo, brandKit] = await Promise.all([
     prisma.promo.findFirstOrThrow({
@@ -22,10 +23,16 @@ export async function loadTemplateData(
   ])
 
   const colors = (brandKit?.colors ?? []) as string[]
-  const account = await prisma.account.findUnique({ where: { id: accountId }, select: { name: true } })
+  const [account, branch] = await Promise.all([
+    prisma.account.findUnique({ where: { id: accountId }, select: { name: true } }),
+    branchId ? prisma.branch.findFirst({ where: { id: branchId, accountId } }) : Promise.resolve(null),
+  ])
+
+  // CTA: use promo CTA if set, otherwise fall back to branch CTA
+  const resolvedCta = promo.cta || branch?.cta || null
 
   return {
-    promo: { id: promo.id, title: promo.title, subhead: promo.subhead, cta: promo.cta },
+    promo: { id: promo.id, title: promo.title, subhead: promo.subhead, cta: resolvedCta },
     items: promo.items.map(item => ({
       name: item.name,
       price: formatPrice(item.price),
@@ -41,6 +48,15 @@ export async function loadTemplateData(
       secondaryColor: colors[1] ?? '#e94560',
       name: account?.name ?? 'My Company',
     },
+    ...(branch ? {
+      branch: {
+        name: branch.name,
+        address: branch.address,
+        phone: branch.phone,
+        email: branch.email,
+        cta: branch.cta,
+      },
+    } : {}),
     watermark,
   }
 }

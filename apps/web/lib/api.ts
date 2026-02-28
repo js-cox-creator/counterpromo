@@ -19,9 +19,20 @@ export interface BootstrapResponse extends Omit<Account, 'stripeCustomerId' | 's
   stripeSubId?: string | null
 }
 
+export interface PromoFolder {
+  id: string
+  accountId: string
+  name: string
+  promoCount: number
+  createdAt: string
+  updatedAt: string
+}
+
 export interface Promo {
   id: string
   accountId: string
+  folderId: string | null
+  branchId: string | null
   title: string
   subhead: string | null
   cta: string | null
@@ -63,6 +74,7 @@ export interface CreatePromoData {
   subhead?: string
   cta?: string
   templateId?: string
+  folderId?: string
 }
 
 export interface PromoItem {
@@ -84,6 +96,89 @@ export interface ApiError {
   limit?: number
 }
 
+export interface Branch {
+  id: string
+  accountId: string
+  name: string
+  address: string | null
+  phone: string | null
+  email: string | null
+  cta: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface TeamMember {
+  id: string
+  clerkId: string
+  email: string
+  name: string | null
+  role: string
+  branchId: string | null
+  createdAt: string
+}
+
+export interface TeamInvite {
+  id: string
+  email: string
+  role: string
+  token: string
+  status: string
+  expiresAt: string
+  createdAt: string
+}
+
+export interface ColumnMappings {
+  name?: string
+  price?: string
+  sku?: string
+  unit?: string
+  category?: string
+  vendor?: string
+}
+
+export interface ImportMapping {
+  id: string
+  accountId: string
+  name: string
+  mappings: ColumnMappings
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ProductSnippet {
+  id: string
+  accountId: string
+  name: string
+  price: string // Decimal serialises to string
+  sku: string | null
+  unit: string | null
+  category: string | null
+  vendor: string | null
+  imageUrl: string | null
+  sourceUrl: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateSnippetData {
+  name: string
+  price: number
+  sku?: string
+  unit?: string
+  category?: string
+  vendor?: string
+  imageUrl?: string
+  sourceUrl?: string
+}
+
+export interface CoopItemUpdate {
+  itemId: string
+  coopVendor?: string
+  coopAmount?: number
+  coopNote?: string
+}
+
 async function request<T>(
   token: string,
   path: string,
@@ -99,14 +194,11 @@ async function request<T>(
   })
 
   if (!res.ok) {
-    const body = await res.json().catch(() => ({ error: res.statusText }))
-    const err = new Error((body as ApiError).error ?? 'Request failed') as Error & {
-      status: number
-      body: ApiError
-    }
-    ;(err as Error & { status: number; body: ApiError }).status = res.status
-    ;(err as Error & { status: number; body: ApiError }).body = body as ApiError
-    throw err
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const rawBody = await res.json().catch(() => ({ error: res.statusText }))
+    const body = rawBody as ApiError
+    const message = typeof body?.error === 'string' ? body.error : 'Request failed'
+    throw Object.assign(new Error(message), { status: res.status, body })
   }
 
   const data = await res.json() as T
@@ -127,8 +219,9 @@ export function apiClient(token: string) {
       },
     },
     promos: {
-      list: async (): Promise<{ data: Promo[]; status: number }> => {
-        return request<Promo[]>(token, '/promos', { method: 'GET' })
+      list: async (folderId?: string | 'unfiled'): Promise<{ data: Promo[]; status: number }> => {
+        const qs = folderId ? `?folderId=${encodeURIComponent(folderId)}` : ''
+        return request<Promo[]>(token, `/promos${qs}`, { method: 'GET' })
       },
       create: async (data: CreatePromoData): Promise<{ data: Promo; status: number }> => {
         return request<Promo>(token, '/promos', {
@@ -137,12 +230,14 @@ export function apiClient(token: string) {
         })
       },
       get: (id: string) => request<Promo & { items: PromoItem[] }>(token, `/promos/${id}`, { method: 'GET' }),
-      patch: (id: string, data: { title?: string; subhead?: string | null; cta?: string | null; templateId?: string | null }) =>
+      patch: (id: string, data: { title?: string; subhead?: string | null; cta?: string | null; templateId?: string | null; folderId?: string | null; branchId?: string | null }) =>
         request<Promo>(token, `/promos/${id}`, {
           method: 'PATCH',
           body: JSON.stringify(data),
         }),
-      render: (id: string) => request<{ jobs: Array<{ jobId: string; type: string }> }>(token, `/promos/${id}/render`, { method: 'POST' }),
+      duplicate: (id: string) =>
+        request<Promo>(token, `/promos/${id}/duplicate`, { method: 'POST', body: JSON.stringify({}) }),
+      render: (id: string) => request<{ jobs: Array<{ jobId: string; type: string }> }>(token, `/promos/${id}/render`, { method: 'POST', body: JSON.stringify({}) }),
       getUploadUrl: (id: string, data: { filename: string; contentType: string }) =>
         request<{ uploadUrl: string; uploadId: string; s3Key: string }>(token, `/promos/${id}/upload`, {
           method: 'POST',
@@ -172,8 +267,36 @@ export function apiClient(token: string) {
           method: 'POST',
           body: JSON.stringify({ items }),
         }),
+      exportZip: (id: string) =>
+        request<{ jobId: string }>(token, `/promos/${id}/export-zip`, {
+          method: 'POST',
+          body: JSON.stringify({}),
+        }),
+      renderEmail: (id: string) =>
+        request<{ jobId: string }>(token, `/promos/${id}/render-email`, {
+          method: 'POST',
+          body: JSON.stringify({}),
+        }),
+      itemFromUrl: (id: string, data: { url: string; itemId?: string }) =>
+        request<{ jobId: string; itemId: string }>(token, `/promos/${id}/items/from-url`, {
+          method: 'POST',
+          body: JSON.stringify(data),
+        }),
+      itemFromSnippet: (promoId: string, snippetId: string) =>
+        request<PromoItem>(token, `/promos/${promoId}/items/from-snippet`, {
+          method: 'POST',
+          body: JSON.stringify({ snippetId }),
+        }),
+      renderBranchPack: (id: string) =>
+        request<{
+          branches: Array<{
+            branchId: string
+            branchName: string
+            jobs: { preview: string; pdf: string; social: string; email: string }
+          }>
+        }>(token, `/promos/${id}/render-branch-pack`, { method: 'POST', body: JSON.stringify({}) }),
       getAssets: (id: string) =>
-        request<Array<{ id: string; type: string; url: string; createdAt: string }>>(
+        request<Array<{ id: string; type: string; branchId: string | null; url: string; createdAt: string }>>(
           token,
           `/promos/${id}/assets`,
           { method: 'GET' },
@@ -211,6 +334,56 @@ export function apiClient(token: string) {
         })
       },
     },
+    branches: {
+      list: () => request<Branch[]>(token, '/branches', { method: 'GET' }),
+      create: (data: { name: string; address?: string; phone?: string; email?: string; cta?: string }) =>
+        request<Branch>(token, '/branches', { method: 'POST', body: JSON.stringify(data) }),
+      get: (id: string) => request<Branch>(token, `/branches/${id}`, { method: 'GET' }),
+      update: (id: string, data: Partial<{ name: string; address: string; phone: string; email: string; cta: string }>) =>
+        request<Branch>(token, `/branches/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+      delete: (id: string) => request<{ ok: boolean }>(token, `/branches/${id}`, { method: 'DELETE' }),
+    },
+    team: {
+      list: () => request<TeamMember[]>(token, '/users', { method: 'GET' }),
+      invite: (data: { email: string; role: string }) =>
+        request<TeamInvite>(token, '/users/invite', { method: 'POST', body: JSON.stringify(data) }),
+      remove: (id: string) => request<void>(token, `/users/${id}`, { method: 'DELETE' }),
+      listInvites: () => request<TeamInvite[]>(token, '/users/invites', { method: 'GET' }),
+      revokeInvite: (id: string) => request<void>(token, `/users/invites/${id}`, { method: 'DELETE' }),
+      updateRole: (id: string, role: string) => request<TeamMember>(token, `/users/${id}`, { method: 'PATCH', body: JSON.stringify({ role }) }),
+    },
+    importMappings: {
+      list: () => request<ImportMapping[]>(token, '/import-mappings', { method: 'GET' }),
+      create: (data: { name: string; mappings: ColumnMappings }) =>
+        request<ImportMapping>(token, '/import-mappings', { method: 'POST', body: JSON.stringify(data) }),
+      update: (id: string, data: { name?: string; mappings?: ColumnMappings }) =>
+        request<ImportMapping>(token, `/import-mappings/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+      delete: (id: string) => request<{ ok: boolean }>(token, `/import-mappings/${id}`, { method: 'DELETE' }),
+    },
+    coop: {
+      updateItems: (promoId: string, items: CoopItemUpdate[]) =>
+        request<{ ok: boolean }>(token, `/coop/promos/${promoId}/items`, {
+          method: 'POST',
+          body: JSON.stringify({ items }),
+        }),
+      generateReport: (promoId: string) =>
+        request<{ jobId: string }>(token, `/coop/promos/${promoId}/report`, {
+          method: 'POST',
+          body: JSON.stringify({}),
+        }),
+      getItems: (promoId: string) =>
+        request<Array<{ id: string; name: string; coopVendor: string | null; coopAmount: string | null; coopNote: string | null }>>(
+          token,
+          `/coop/promos/${promoId}/items`,
+          { method: 'GET' },
+        ),
+      getReportAsset: (promoId: string) =>
+        request<{ url: string | null; createdAt: string | null }>(
+          token,
+          `/coop/promos/${promoId}/report-asset`,
+          { method: 'GET' },
+        ),
+    },
     billing: {
       checkout: (priceId: string) =>
         request<{ url: string }>(token, '/billing/checkout', {
@@ -222,6 +395,29 @@ export function apiClient(token: string) {
           method: 'POST',
           body: JSON.stringify({}),
         }),
+    },
+    snippets: {
+      list: () => request<ProductSnippet[]>(token, '/snippets', { method: 'GET' }),
+      create: (data: CreateSnippetData) =>
+        request<ProductSnippet>(token, '/snippets', { method: 'POST', body: JSON.stringify(data) }),
+      update: (id: string, data: Partial<CreateSnippetData>) =>
+        request<ProductSnippet>(token, `/snippets/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+      delete: (id: string) => request<{ ok: boolean }>(token, `/snippets/${id}`, { method: 'DELETE' }),
+    },
+    folders: {
+      list: () => request<PromoFolder[]>(token, '/folders', { method: 'GET' }),
+      create: (name: string) =>
+        request<PromoFolder>(token, '/folders', {
+          method: 'POST',
+          body: JSON.stringify({ name }),
+        }),
+      rename: (id: string, name: string) =>
+        request<PromoFolder>(token, `/folders/${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ name }),
+        }),
+      delete: (id: string) =>
+        request<void>(token, `/folders/${id}`, { method: 'DELETE' }),
     },
   }
 }

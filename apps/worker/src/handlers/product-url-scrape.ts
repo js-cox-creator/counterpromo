@@ -12,9 +12,9 @@ function resolveUrl(path: string, base: string): string {
 }
 
 export async function handleProductUrlScrape(payload: ProductUrlScrapePayload): Promise<void> {
-  await startJob(payload.jobId)
-
   try {
+    await startJob(payload.jobId)
+
     // Fetch the product URL
     const response = await fetch(payload.url, { signal: AbortSignal.timeout(10000) })
     const html = await response.text()

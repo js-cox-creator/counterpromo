@@ -10,7 +10,7 @@ export async function handleRenderPdf(payload: RenderPdfPayload): Promise<void> 
   try {
     await startJob(payload.jobId)
 
-    const data = await loadTemplateData(payload.promoId, payload.accountId, payload.watermark)
+    const data = await loadTemplateData(payload.promoId, payload.accountId, payload.watermark, payload.branchId)
 
     const promo = await prisma.promo.findUnique({
       where: { id: payload.promoId },
@@ -22,7 +22,8 @@ export async function handleRenderPdf(payload: RenderPdfPayload): Promise<void> 
 
     const pdfBuffer = await renderHtmlToPdf(html)
 
-    const s3Key = `assets/${payload.accountId}/${payload.promoId}/pdf/${Date.now()}.pdf`
+    const branchSegment = payload.branchId ? `branches/${payload.branchId}/` : ''
+    const s3Key = `assets/${payload.accountId}/${payload.promoId}/${branchSegment}pdf/${Date.now()}.pdf`
 
     await uploadToS3((process.env.S3_ASSETS_BUCKET ?? process.env.ASSETS_BUCKET)!, s3Key, pdfBuffer, 'application/pdf')
 
@@ -30,10 +31,21 @@ export async function handleRenderPdf(payload: RenderPdfPayload): Promise<void> 
       data: {
         accountId: payload.accountId,
         promoId: payload.promoId,
+        branchId: payload.branchId ?? null,
         type: 'pdf',
         s3Key,
         sizeBytes: pdfBuffer.length,
       },
+    })
+
+    // Increment monthly render count for usage tracking
+    const now = new Date()
+    const year = now.getUTCFullYear()
+    const month = now.getUTCMonth() + 1
+    await prisma.usageMonthly.upsert({
+      where: { accountId_year_month: { accountId: payload.accountId, year, month } },
+      create: { accountId: payload.accountId, year, month, promosCount: 1 },
+      update: { promosCount: { increment: 1 } },
     })
 
     await completeJob(payload.jobId, { s3Key, sizeBytes: pdfBuffer.length })

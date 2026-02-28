@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useAuth } from '@clerk/nextjs'
-import { apiClient, type Promo } from '@/lib/api'
+import { apiClient, type Promo, type PromoFolder } from '@/lib/api'
 import {
   Dialog,
   DialogContent,
@@ -13,26 +13,45 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 interface CreatePromoDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onCreated: (promo: Promo) => void
+  folders?: PromoFolder[]
+  activeFolderId?: string
 }
 
-export function CreatePromoDialog({ open, onOpenChange, onCreated }: CreatePromoDialogProps) {
+export function CreatePromoDialog({
+  open,
+  onOpenChange,
+  onCreated,
+  folders = [],
+  activeFolderId,
+}: CreatePromoDialogProps) {
   const { getToken } = useAuth()
 
   const [title, setTitle] = useState('')
   const [subhead, setSubhead] = useState('')
   const [cta, setCta] = useState('')
+  const [folderId, setFolderId] = useState<string>(activeFolderId ?? '__none__')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Sync folderId when activeFolderId prop changes (e.g. user switches folder then opens dialog)
+  // We use a key on the dialog instead — but also reset on open
   function resetForm() {
     setTitle('')
     setSubhead('')
     setCta('')
+    setFolderId(activeFolderId ?? '__none__')
     setError(null)
   }
 
@@ -58,6 +77,7 @@ export function CreatePromoDialog({ open, onOpenChange, onCreated }: CreatePromo
         title: title.trim(),
         subhead: subhead.trim() || undefined,
         cta: cta.trim() || undefined,
+        folderId: folderId !== '__none__' ? folderId : undefined,
       })
 
       onCreated(promo)
@@ -126,6 +146,29 @@ export function CreatePromoDialog({ open, onOpenChange, onCreated }: CreatePromo
               disabled={isSubmitting}
             />
           </div>
+
+          {folders.length > 0 && (
+            <div className="space-y-1.5">
+              <Label htmlFor="promo-folder">Folder</Label>
+              <Select
+                value={folderId}
+                onValueChange={setFolderId}
+                disabled={isSubmitting}
+              >
+                <SelectTrigger id="promo-folder">
+                  <SelectValue placeholder="No folder" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">No folder</SelectItem>
+                  {folders.map((f) => (
+                    <SelectItem key={f.id} value={f.id}>
+                      {f.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {error && (
             <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-md">{error}</p>
