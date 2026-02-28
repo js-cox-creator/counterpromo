@@ -4,14 +4,13 @@ import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@clerk/nextjs'
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
-import Link from 'next/link'
-import { Plus, Folder, FolderOpen, FolderInput, MoreHorizontal, Pencil, Trash2, Copy } from 'lucide-react'
+import { Plus, Folder, FolderOpen, MoreHorizontal, Pencil, Trash2, LayoutGrid, List } from 'lucide-react'
 import { useBootstrap } from '@/hooks/use-bootstrap'
 import { apiClient, type Promo, type PromoFolder } from '@/lib/api'
 import { CreatePromoDialog } from '@/components/create-promo-dialog'
+import { PromoCard } from '@/components/promo-card'
+import { PromoListRow } from '@/components/promo-list-row'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   DropdownMenu,
@@ -20,25 +19,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover'
 import { Input } from '@/components/ui/input'
-
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })
-}
-
-function statusVariant(status: string): string {
-  if (status === 'ready') return 'bg-green-100 text-green-800 border-green-200'
-  return 'bg-slate-100 text-slate-700 border-slate-200'
-}
+import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 
 // ─── Folder sidebar item ──────────────────────────────────────────────────────
 
@@ -104,7 +86,7 @@ function FolderItem({ folder, active, onClick, onRename, onDelete }: FolderItemP
       {!editing && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-            <button className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-slate-200">
+            <button className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-slate-200">
               <MoreHorizontal className="h-3 w-3 text-slate-500" />
             </button>
           </DropdownMenuTrigger>
@@ -125,71 +107,6 @@ function FolderItem({ folder, active, onClick, onRename, onDelete }: FolderItemP
         </DropdownMenu>
       )}
     </div>
-  )
-}
-
-// ─── Move-to-folder popover ───────────────────────────────────────────────────
-
-interface MoveToFolderProps {
-  promo: Promo
-  folders: PromoFolder[]
-  onMove: (promoId: string, folderId: string | null) => void
-}
-
-function MoveToFolder({ promo, folders, onMove }: MoveToFolderProps) {
-  const [open, setOpen] = useState(false)
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
-          title="Move to folder"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <FolderInput className="h-4 w-4" />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent className="w-48 p-1" align="end" onClick={(e) => e.stopPropagation()}>
-        {folders.length === 0 ? (
-          <p className="text-xs text-slate-500 px-2 py-1.5">No folders yet</p>
-        ) : (
-          <>
-            {folders.map((f) => (
-              <button
-                key={f.id}
-                className={`w-full text-left px-2 py-1.5 rounded text-sm hover:bg-slate-100 flex items-center gap-2 ${
-                  promo.folderId === f.id ? 'font-medium text-slate-900' : 'text-slate-700'
-                }`}
-                onClick={(e) => {
-                  e.preventDefault()
-                  onMove(promo.id, f.id)
-                  setOpen(false)
-                }}
-              >
-                <Folder className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                <span className="truncate">{f.name}</span>
-              </button>
-            ))}
-            {promo.folderId && (
-              <>
-                <div className="my-1 border-t" />
-                <button
-                  className="w-full text-left px-2 py-1.5 rounded text-sm text-slate-500 hover:bg-slate-100"
-                  onClick={(e) => {
-                    e.preventDefault()
-                    onMove(promo.id, null)
-                    setOpen(false)
-                  }}
-                >
-                  Remove from folder
-                </button>
-              </>
-            )}
-          </>
-        )}
-      </PopoverContent>
-    </Popover>
   )
 }
 
@@ -247,6 +164,10 @@ export default function DashboardPage() {
   const [activeFolderId, setActiveFolderId] = useState<string | 'unfiled' | null>(null)
   const [addingFolder, setAddingFolder] = useState(false)
   const [folderError, setFolderError] = useState<string | null>(null)
+  const [view, setView] = useState<'grid' | 'list'>(() => {
+    if (typeof window === 'undefined') return 'grid'
+    return (localStorage.getItem('counterpromo.dashboard.view') as 'grid' | 'list') ?? 'grid'
+  })
 
   const { isNewAccount, isLoading: bootstrapLoading } = useBootstrap()
 
@@ -255,6 +176,11 @@ export default function DashboardPage() {
       router.push('/onboarding')
     }
   }, [isNewAccount, bootstrapLoading, router])
+
+  function setViewPersisted(v: 'grid' | 'list') {
+    setView(v)
+    localStorage.setItem('counterpromo.dashboard.view', v)
+  }
 
   const enabled = !bootstrapLoading && !isNewAccount
 
@@ -337,13 +263,24 @@ export default function DashboardPage() {
       const token = await getToken()
       return apiClient(token!).promos.duplicate(promoId)
     },
-    onSuccess: () => {
+    onSuccess: (res) => {
       void queryClient.invalidateQueries({ queryKey: ['promos'] })
       void queryClient.invalidateQueries({ queryKey: ['usage'] })
+      router.push(`/promos/${res.data.id}`)
     },
   })
 
-  function handlePromoCreated(promo: Promo) {
+  const deletePromo = useMutation({
+    mutationFn: async (promoId: string) => {
+      const token = await getToken()
+      return apiClient(token!).promos.delete(promoId)
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['promos'] })
+    },
+  })
+
+  function handlePromoCreated(_promo: Promo) {
     void queryClient.invalidateQueries({ queryKey: ['promos'] })
     void queryClient.invalidateQueries({ queryKey: ['usage'] })
     void queryClient.invalidateQueries({ queryKey: ['folders'] })
@@ -352,31 +289,46 @@ export default function DashboardPage() {
   const folders = foldersData?.data ?? []
   const promos = promosData?.data ?? []
   const usage = usageData?.data
+  const totalPromoCount = promos.length
 
   if (bootstrapLoading) {
     return (
       <div className="p-8">
         <Skeleton className="h-8 w-48 mb-8" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-36 w-full rounded-xl" />
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-5">
+          {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+            <Skeleton key={i} className="aspect-[3/4] w-full rounded-xl" />
           ))}
         </div>
       </div>
     )
   }
 
+  const usagePct = usage ? Math.min(100, Math.round((usage.promosUsed / usage.promosLimit) * 100)) : 0
+  const atLimit = usage ? usage.promosUsed >= usage.promosLimit : false
+
   return (
-    <div className="p-8 max-w-6xl">
+    <div className="p-8 max-w-7xl">
       {/* Usage banner */}
       {usage && (
-        <div className="mb-6 px-4 py-3 bg-slate-100 rounded-lg text-sm text-slate-600">
-          <span className="font-medium text-slate-800">{usage.promosUsed}</span> of{' '}
-          <span className="font-medium text-slate-800">{usage.promosLimit}</span> promos used this
-          month
-          {usage.promosUsed >= usage.promosLimit && (
-            <span className="ml-2 text-amber-700 font-medium">— limit reached</span>
-          )}
+        <div className="mb-6 px-4 py-3 bg-slate-100 rounded-lg">
+          <div className="flex items-center justify-between text-sm mb-1.5">
+            <span className="text-slate-600">
+              <span className="font-medium text-slate-800">{usage.promosUsed}</span>
+              {' of '}
+              <span className="font-medium text-slate-800">{usage.promosLimit}</span>
+              {' promos used this month'}
+            </span>
+            {atLimit && (
+              <span className="text-amber-700 font-medium text-xs">Limit reached</span>
+            )}
+          </div>
+          <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all ${atLimit ? 'bg-amber-500' : 'bg-indigo-500'}`}
+              style={{ width: `${usagePct}%` }}
+            />
+          </div>
         </div>
       )}
 
@@ -389,10 +341,47 @@ export default function DashboardPage() {
         </Button>
       </div>
 
-      {/* Main layout: sidebar + grid */}
-      <div className="flex gap-6">
+      {/* Toolbar row */}
+      <TooltipProvider>
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-sm text-slate-500">
+            {activeFolderId === null
+              ? 'All promos'
+              : activeFolderId === 'unfiled'
+              ? 'Unfiled'
+              : folders.find((f) => f.id === activeFolderId)?.name ?? 'Folder'}
+          </p>
+          <div className="flex items-center gap-1 border rounded-lg p-0.5 bg-slate-50">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  className={`p-1.5 rounded-md transition-colors ${view === 'grid' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400 hover:text-slate-700'}`}
+                  onClick={() => setViewPersisted('grid')}
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Grid view</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  className={`p-1.5 rounded-md transition-colors ${view === 'list' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400 hover:text-slate-700'}`}
+                  onClick={() => setViewPersisted('list')}
+                >
+                  <List className="h-4 w-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>List view</TooltipContent>
+            </Tooltip>
+          </div>
+        </div>
+      </TooltipProvider>
+
+      {/* Main layout: sidebar + content */}
+      <div className="flex gap-0">
         {/* Folder sidebar */}
-        <aside className="w-44 shrink-0 space-y-0.5">
+        <aside className="w-52 shrink-0 border-r border-slate-200 pr-4 mr-4 space-y-0.5">
           {/* All promos */}
           <div
             className={`flex items-center gap-2 rounded-md px-2 py-1.5 cursor-pointer text-sm transition-colors ${
@@ -402,9 +391,17 @@ export default function DashboardPage() {
             }`}
             onClick={() => setActiveFolderId(null)}
           >
-            <Folder className="h-4 w-4 shrink-0 text-slate-400" />
+            <LayoutGrid className="h-4 w-4 shrink-0 text-slate-400" />
             <span className="flex-1 min-w-0 truncate">All promos</span>
+            <span className="text-xs text-slate-400 shrink-0">{totalPromoCount}</span>
           </div>
+
+          {/* Folders section label */}
+          {folders.length > 0 && (
+            <p className="px-2 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+              Folders
+            </p>
+          )}
 
           {/* Folder list */}
           {folders.map((folder) => (
@@ -434,10 +431,10 @@ export default function DashboardPage() {
             <p className="text-xs text-red-600 px-2 py-1">{folderError}</p>
           )}
 
-          {/* New folder button */}
+          {/* New folder button — sticky at bottom of section */}
           {!addingFolder && (
             <button
-              className="flex items-center gap-1.5 w-full px-2 py-1.5 text-xs text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-100 transition-colors mt-1"
+              className="flex items-center gap-1.5 w-full px-2 py-1.5 text-xs text-slate-400 hover:text-slate-600 rounded-md border border-dashed border-slate-300 hover:border-slate-400 hover:bg-slate-50 transition-colors mt-2"
               onClick={() => { setFolderError(null); setAddingFolder(true) }}
             >
               <Plus className="h-3.5 w-3.5" />
@@ -446,14 +443,22 @@ export default function DashboardPage() {
           )}
         </aside>
 
-        {/* Promo grid */}
+        {/* Content area */}
         <div className="flex-1 min-w-0">
           {promosLoading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-36 w-full rounded-xl" />
-              ))}
-            </div>
+            view === 'grid' ? (
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-5">
+                {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                  <Skeleton key={i} className="aspect-[3/4] w-full rounded-xl" />
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <Skeleton key={i} className="h-14 w-full rounded-lg" />
+                ))}
+              </div>
+            )
           ) : promosError ? (
             <div className="px-4 py-3 bg-red-50 text-red-700 rounded-lg text-sm">
               Failed to load promos. Please refresh the page.
@@ -466,60 +471,39 @@ export default function DashboardPage() {
                 Create your first promo
               </Button>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          ) : view === 'grid' ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-5">
               {promos.map((promo) => (
-                <Link key={promo.id} href={`/promos/${promo.id}`} className="block group">
-                  <Card className="h-full transition-shadow group-hover:shadow-md cursor-pointer">
-                    <CardHeader className="pb-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <CardTitle className="text-base font-semibold text-slate-900 leading-tight">
-                          {promo.title}
-                        </CardTitle>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <MoveToFolder
-                            promo={promo}
-                            folders={folders}
-                            onMove={(promoId, folderId) => movePromo.mutate({ promoId, folderId })}
-                          />
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button
-                                className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <MoreHorizontal className="h-4 w-4" />
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-40" onClick={(e) => e.stopPropagation()}>
-                              <DropdownMenuItem
-                                onClick={(e) => { e.stopPropagation(); duplicatePromo.mutate(promo.id) }}
-                              >
-                                <Copy className="h-3.5 w-3.5 mr-2" /> Duplicate
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                          <Badge
-                            className={`capitalize border ${statusVariant(promo.status)}`}
-                            variant="outline"
-                          >
-                            {promo.status}
-                          </Badge>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-sm text-slate-500 space-y-1">
-                        {promo.itemCount != null && (
-                          <p>
-                            {promo.itemCount} {promo.itemCount === 1 ? 'item' : 'items'}
-                          </p>
-                        )}
-                        <p>Created {formatDate(promo.createdAt)}</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Link>
+                <PromoCard
+                  key={promo.id}
+                  promo={promo}
+                  folders={folders}
+                  onDuplicate={(id) => duplicatePromo.mutate(id)}
+                  onMove={(promoId, folderId) => movePromo.mutate({ promoId, folderId })}
+                  onDelete={(id) => deletePromo.mutate(id)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-0.5">
+              {/* List header */}
+              <div className="flex items-center gap-4 px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                <div className="w-[40px] shrink-0" />
+                <div className="flex-1 min-w-0">Title</div>
+                <div className="w-24 shrink-0">Status</div>
+                <div className="w-20 text-right shrink-0">Items</div>
+                <div className="w-32 shrink-0">Created</div>
+                <div className="w-9 shrink-0" />
+              </div>
+              {promos.map((promo) => (
+                <PromoListRow
+                  key={promo.id}
+                  promo={promo}
+                  folders={folders}
+                  onDuplicate={(id) => duplicatePromo.mutate(id)}
+                  onMove={(promoId, folderId) => movePromo.mutate({ promoId, folderId })}
+                  onDelete={(id) => deletePromo.mutate(id)}
+                />
               ))}
             </div>
           )}

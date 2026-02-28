@@ -41,6 +41,7 @@ export interface Promo {
   createdAt: string
   updatedAt: string
   itemCount?: number
+  previewUrl?: string | null
 }
 
 export interface Usage {
@@ -187,7 +188,7 @@ async function request<T>(
   const res = await fetch(`${BASE_URL}${path}`, {
     ...options,
     headers: {
-      'Content-Type': 'application/json',
+      ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
       Authorization: `Bearer ${token}`,
       ...(options.headers ?? {}),
     },
@@ -287,6 +288,8 @@ export function apiClient(token: string) {
           method: 'POST',
           body: JSON.stringify({ snippetId }),
         }),
+      delete: (id: string) =>
+        request<{ ok: boolean }>(token, `/promos/${id}`, { method: 'DELETE' }),
       renderBranchPack: (id: string) =>
         request<{
           branches: Array<{

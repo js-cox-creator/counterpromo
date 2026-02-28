@@ -11,6 +11,7 @@ const CreatePromoBody = z.object({
   subhead: z.string().max(500).optional(),
   cta: z.string().max(255).optional(),
   templateId: z.string().optional(),
+  folderId: z.string().optional(),
 })
 
 const BulkItemsBody = z.object({
@@ -67,14 +68,23 @@ export async function promoRoutes(app: FastifyInstance) {
       },
       include: {
         _count: { select: { items: true } },
+        assets: {
+          where: { type: 'preview', branchId: null },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { s3Key: true },
+        },
       },
       orderBy: { createdAt: 'desc' },
     })
 
-    const result = promos.map(({ _count, ...promo }) => ({
-      ...promo,
-      itemCount: _count.items,
-    }))
+    const result = await Promise.all(
+      promos.map(async ({ _count, assets, ...promo }) => ({
+        ...promo,
+        itemCount: _count.items,
+        previewUrl: assets[0] ? await getAssetSignedUrl(assets[0].s3Key) : null,
+      }))
+    )
 
     return reply.send(result)
   })
@@ -87,7 +97,7 @@ export async function promoRoutes(app: FastifyInstance) {
     }
 
     const { accountId } = request.auth
-    const { title, subhead, cta, templateId } = parsed.data
+    const { title, subhead, cta, templateId, folderId } = parsed.data
 
     // Fetch account plan
     const account = await prisma.account.findUnique({
@@ -128,6 +138,7 @@ export async function promoRoutes(app: FastifyInstance) {
           subhead: subhead ?? null,
           cta: cta ?? null,
           templateId: templateId ?? null,
+          folderId: folderId ?? null,
           status: 'draft',
         },
       }),
@@ -771,6 +782,16 @@ export async function promoRoutes(app: FastifyInstance) {
     )
 
     return reply.status(202).send({ branches: result })
+  })
+
+  // DELETE /promos/:id — permanently delete a promo
+  app.delete('/:id', { preHandler: requireAuth }, async (request, reply) => {
+    const { accountId } = request.auth
+    const { id } = request.params as { id: string }
+    const promo = await prisma.promo.findFirst({ where: { id, accountId } })
+    if (!promo) return reply.status(404).send({ error: 'Promo not found' })
+    await prisma.promo.delete({ where: { id } })
+    return reply.send({ ok: true })
   })
 
   // GET /promos/:id/assets — list assets with signed S3 URLs
