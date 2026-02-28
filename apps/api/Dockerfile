@@ -39,4 +39,7 @@ COPY --from=builder /app/node_modules ./node_modules
 ENV PRISMA_QUERY_ENGINE_LIBRARY=/app/packages/db/generated/client/libquery_engine-linux-musl-openssl-3.0.x.so.node
 
 EXPOSE 3001
-CMD ["node", "apps/api/dist/server.js"]
+CMD ["sh", "-c", \
+  "export DATABASE_URL=\"postgresql://${DB_USERNAME}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}\" && \
+   npx prisma migrate deploy --schema packages/db/prisma/schema.prisma && \
+   node apps/api/dist/server.js"]

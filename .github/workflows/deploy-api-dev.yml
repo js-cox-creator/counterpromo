@@ -71,6 +71,26 @@ jobs:
 
           echo "NEW_REV=$(cat rev.txt)" >> $GITHUB_ENV
 
+      - name: Run DB migration
+        run: |
+          TASK_ARN=$(aws ecs run-task \
+            --cluster "$CLUSTER" \
+            --task-definition "$TASK_FAMILY:$NEW_REV" \
+            --launch-type FARGATE \
+            --network-configuration "awsvpcConfiguration={subnets=[subnet-0f40232407cf12c10,subnet-03b576bcd0fec5e20],securityGroups=[sg-01536322f2e7edde1],assignPublicIp=DISABLED}" \
+            --overrides "{\"containerOverrides\":[{\"name\":\"api\",\"command\":[\"sh\",\"-c\",\"export DATABASE_URL=\\\"postgresql://\${DB_USERNAME}:\${DB_PASSWORD}@\${DB_HOST}:\${DB_PORT}/\${DB_NAME}\\\" && npx prisma migrate deploy --schema packages/db/prisma/schema.prisma\"]}]}" \
+            --query 'tasks[0].taskArn' --output text)
+          echo "Migration task ARN: $TASK_ARN"
+          aws ecs wait tasks-stopped --cluster "$CLUSTER" --tasks "$TASK_ARN"
+          EXIT_CODE=$(aws ecs describe-tasks \
+            --cluster "$CLUSTER" --tasks "$TASK_ARN" \
+            --query 'tasks[0].containers[0].exitCode' --output text)
+          echo "Migration exit code: $EXIT_CODE"
+          if [ "$EXIT_CODE" != "0" ]; then
+            echo "::error::DB migration failed — deploy aborted"
+            exit 1
+          fi
+
       - name: Update ECS service
         run: |
           aws ecs update-service \
