@@ -71,9 +71,12 @@ export interface BrandKit {
   accountId: string
   logoUrl: string | null
   colors: string[]
+  textColors: string[]
   fonts: string[]
   defaultCta: string | null
   websiteUrl: string | null
+  strapline: string | null
+  aiDescription: string | null
   createdAt: string
   updatedAt: string
 }
@@ -81,7 +84,12 @@ export interface BrandKit {
 export interface SaveBrandKitData {
   logoUrl?: string
   colors?: string[]
+  textColors?: string[]
+  fonts?: string[]
   defaultCta?: string
+  websiteUrl?: string
+  strapline?: string
+  aiDescription?: string
 }
 
 export interface CreatePromoData {
@@ -348,6 +356,12 @@ export function apiClient(token: string) {
         return request<unknown>(token, '/brand-kit/bootstrap-from-url', {
           method: 'POST',
           body: JSON.stringify({ url }),
+        })
+      },
+      generateDescription: async (): Promise<{ data: { aiDescription: string }; status: number }> => {
+        return request<{ aiDescription: string }>(token, '/brand-kit/generate-description', {
+          method: 'POST',
+          body: JSON.stringify({}),
         })
       },
     },

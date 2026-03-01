@@ -10,7 +10,7 @@ import { apiClient } from '@/lib/api'
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/templates', label: 'Templates', icon: LayoutTemplate },
-  { href: '/brand-kit', label: 'Brand Kit', icon: Palette },
+  { href: '/brand-kit', label: 'Branding', icon: Palette },
   { href: '/branches', label: 'Branches', icon: GitBranch },
   { href: '/import-mappings', label: 'Import Mappings', icon: FileSpreadsheet },
   { href: '/snippets', label: 'Snippets', icon: Bookmark },

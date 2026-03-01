@@ -294,46 +294,132 @@ export async function handleBrandBootstrap(payload: BrandBootstrapPayload): Prom
       }
     }
 
-    // ── Extract colors ────────────────────────────────────────────────────────
-    const colors: string[] = []
-
-    const themeColor = $('meta[name="theme-color"]').attr('content')
-    if (themeColor && /^#[0-9a-fA-F]{6}$/.test(themeColor)) {
-      colors.push(themeColor)
-    }
-
-    // Try to extract colors from the first stylesheet
+    // ── Fetch primary stylesheet ───────────────────────────────────────────────
+    let cssText = ''
     const firstStylesheet = $('link[rel="stylesheet"]').first().attr('href')
     if (firstStylesheet) {
       try {
         const cssUrl = resolveUrl(firstStylesheet, payload.url)
         const cssResponse = await fetch(cssUrl, { signal: AbortSignal.timeout(5000) })
-        const cssText = await cssResponse.text()
-        const cssColors = cssText.match(/#[0-9a-fA-F]{6}/g) ?? []
-        // Dedupe and take top 5
-        const uniqueCssColors = [...new Set(cssColors)].slice(0, 5)
-        colors.push(...uniqueCssColors)
+        cssText = await cssResponse.text()
       } catch {
         // Ignore CSS fetch errors
       }
     }
 
-    // Dedupe all colors and limit to 5
-    const uniqueColors = [...new Set(colors)].slice(0, 5)
+    // ── Extract background colors ─────────────────────────────────────────────
+    // Start with theme-color meta as the primary bg signal
+    const bgColorCounts = new Map<string, number>()
+
+    const themeColor = $('meta[name="theme-color"]').attr('content')
+    if (themeColor && /^#[0-9a-fA-F]{6}$/i.test(themeColor)) {
+      bgColorCounts.set(themeColor.toLowerCase(), (bgColorCounts.get(themeColor.toLowerCase()) ?? 0) + 10)
+    }
+
+    // CSS background-color / background shorthand
+    const bgMatches = cssText.matchAll(/background(?:-color)?\s*:\s*(#[0-9a-fA-F]{6})\b/gi)
+    for (const m of bgMatches) {
+      const hex = m[1].toLowerCase()
+      bgColorCounts.set(hex, (bgColorCounts.get(hex) ?? 0) + 1)
+    }
+
+    // ── Extract text/font colors ───────────────────────────────────────────────
+    const textColorCounts = new Map<string, number>()
+
+    // CSS color: declarations (but not background-color)
+    const textMatches = cssText.matchAll(/(?:^|[;\s{,])color\s*:\s*(#[0-9a-fA-F]{6})\b/gim)
+    for (const m of textMatches) {
+      const hex = m[1].toLowerCase()
+      textColorCounts.set(hex, (textColorCounts.get(hex) ?? 0) + 1)
+    }
+
+    // ── Filter helpers ────────────────────────────────────────────────────────
+    // Near-white (luminance > 0.85) — not useful as a brand bg color
+    function isNearWhite(hex: string) { return relativeLuminance(hex) > 0.85 }
+    // Near-black (luminance < 0.04) — not useful as a brand text color
+    function isNearBlack(hex: string) { return relativeLuminance(hex) < 0.04 }
+    // Greyscale — low saturation, skip for brand palette
+    function isGreyscale(hex: string) {
+      const [r, g, b] = hexToRgb(hex)
+      const [, s] = rgbToHsl(r, g, b)
+      return s < 0.08
+    }
+
+    function topColors(counts: Map<string, number>, filterFn: (h: string) => boolean, limit: number): string[] {
+      return [...counts.entries()]
+        .filter(([hex]) => !filterFn(hex) && !isGreyscale(hex))
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, limit)
+        .map(([hex]) => hex)
+    }
+
+    const rawBgColors = topColors(bgColorCounts, isNearWhite, 2)
+    const rawTextColors = topColors(textColorCounts, isNearBlack, 2)
 
     // ── Contrast checking & palette refinement ────────────────────────────────
-    // Assign semantic roles: primary = [0], secondary = [1], accent = [2]
-    // primary/secondary: checked against white (#fff); accent: checked against black (#000)
-
-    const refinedColors = uniqueColors.map((hex, idx) => {
-      if (!hex || !/^#[0-9a-fA-F]{6}$/i.test(hex)) return hex
-      if (idx === 2) {
-        // Accent: ensure readable on dark backgrounds (check against black)
-        return adjustContrast(hex, BLACK)
-      }
-      // Primary (0) and secondary (1): ensure readable on light backgrounds
+    const refinedColors = rawBgColors.map((hex) => {
+      if (!/^#[0-9a-fA-F]{6}$/i.test(hex)) return hex
       return adjustContrast(hex, WHITE)
     })
+
+    const refinedTextColors = rawTextColors.map((hex) => {
+      if (!/^#[0-9a-fA-F]{6}$/i.test(hex)) return hex
+      return adjustContrast(hex, WHITE)
+    })
+
+    // ── Extract fonts ──────────────────────────────────────────────────────────
+    const GENERIC_FAMILIES = new Set(['serif', 'sans-serif', 'monospace', 'cursive', 'fantasy', 'system-ui', 'inherit', 'initial', 'unset'])
+    const fontCounts = new Map<string, number>()
+
+    const fontMatches = cssText.matchAll(/font-family\s*:\s*([^;{}]+)/gi)
+    for (const m of fontMatches) {
+      // A font-family value can be a comma-separated list — take the first named font
+      const families = m[1].split(',').map((f) => f.trim().replace(/['"]/g, '').trim())
+      for (const family of families) {
+        if (!family || GENERIC_FAMILIES.has(family.toLowerCase())) continue
+        // Normalise to title case and skip anything that looks like a CSS variable
+        if (family.startsWith('var(') || family.startsWith('--')) continue
+        const normalised = family
+        fontCounts.set(normalised, (fontCounts.get(normalised) ?? 0) + 1)
+        break // only count the first non-generic family per declaration
+      }
+    }
+
+    const extractedFonts = [...fontCounts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 2)
+      .map(([name]) => name)
+
+    // ── Extract strapline ─────────────────────────────────────────────────────
+    // Priority: explicit tagline element → og:description → meta description
+    let strapline: string | undefined
+
+    // Common CSS selectors for taglines / straplines
+    const taglineSelectors = [
+      '[class*="tagline"]',
+      '[class*="strapline"]',
+      '[class*="slogan"]',
+      '[class*="headline"]',
+      '[id*="tagline"]',
+      '[id*="strapline"]',
+    ]
+    for (const sel of taglineSelectors) {
+      const text = $(sel).first().text().trim()
+      if (text && text.length >= 5 && text.length <= 200) {
+        strapline = text
+        break
+      }
+    }
+
+    if (!strapline) {
+      const ogDesc = $('meta[property="og:description"]').attr('content')?.trim()
+      if (ogDesc && ogDesc.length >= 5 && ogDesc.length <= 200) strapline = ogDesc
+    }
+
+    if (!strapline) {
+      const metaDesc = $('meta[name="description"]').attr('content')?.trim()
+      if (metaDesc && metaDesc.length >= 5 && metaDesc.length <= 200) strapline = metaDesc
+    }
 
     // ── Upsert BrandKit ───────────────────────────────────────────────────────
     await prisma.brandKit.upsert({
@@ -342,12 +428,18 @@ export async function handleBrandBootstrap(payload: BrandBootstrapPayload): Prom
         accountId: payload.accountId,
         logoUrl: logoUrl ?? null,
         colors: refinedColors,
+        textColors: refinedTextColors,
+        fonts: extractedFonts,
         websiteUrl: payload.url,
+        strapline: strapline ?? null,
       },
       update: {
         logoUrl: logoUrl ?? undefined,
-        colors: refinedColors.length ? refinedColors : undefined,
+        ...(refinedColors.length ? { colors: refinedColors } : {}),
+        ...(refinedTextColors.length ? { textColors: refinedTextColors } : {}),
+        ...(extractedFonts.length ? { fonts: extractedFonts } : {}),
         websiteUrl: payload.url,
+        ...(strapline ? { strapline } : {}),
       },
     })
 
@@ -355,7 +447,10 @@ export async function handleBrandBootstrap(payload: BrandBootstrapPayload): Prom
       logoUrl,
       logoS3Key,
       colors: refinedColors,
+      textColors: refinedTextColors,
+      fonts: extractedFonts,
       websiteUrl: payload.url,
+      strapline,
     })
   } catch (err) {
     await failJob(payload.jobId, err)
