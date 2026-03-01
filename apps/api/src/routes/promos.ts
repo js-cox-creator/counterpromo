@@ -163,6 +163,7 @@ export async function promoRoutes(app: FastifyInstance) {
       cta?: string | null
       templateId?: string | null
       folderId?: string | null
+      keywords?: string[]
     }
 
     const promo = await prisma.promo.findFirst({
@@ -182,6 +183,7 @@ export async function promoRoutes(app: FastifyInstance) {
         ...(body.cta !== undefined ? { cta: body.cta } : {}),
         ...(body.templateId !== undefined ? { templateId: body.templateId } : {}),
         ...(body.folderId !== undefined ? { folderId: body.folderId } : {}),
+        ...(body.keywords !== undefined ? { keywords: body.keywords } : {}),
       },
     })
 

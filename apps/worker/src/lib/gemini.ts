@@ -58,6 +58,23 @@ Guidelines:
   }
 }
 
+export async function generateCopy(
+  prompt: string,
+  context: { brandName: string; promoTitle: string; keywords: string[] },
+): Promise<string | null> {
+  if (!process.env.GEMINI_API_KEY) return null
+
+  try {
+    const model = getModel()
+    const systemCtx = `Brand: ${context.brandName}. Promo: "${context.promoTitle}". Keywords: ${context.keywords.join(', ') || 'none'}.`
+    const result = await model.generateContent(`${systemCtx}\n\nTask: ${prompt}`)
+    return result.response.text().trim() || null
+  } catch (err) {
+    console.warn('Gemini generateCopy failed (non-fatal):', err instanceof Error ? err.message : err)
+    return null
+  }
+}
+
 export async function generateEmailCopy(
   data: TemplatePromoData,
 ): Promise<{ subject: string; preheader: string; bodyHtml: string }> {

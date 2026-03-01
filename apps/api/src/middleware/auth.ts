@@ -7,6 +7,7 @@ export interface AuthContext {
   accountId: string
   role: string
   branchId: string | null
+  isProductAdmin: boolean
 }
 
 export interface JwtContext {
@@ -32,7 +33,13 @@ export async function requireAuth(request: FastifyRequest, reply: FastifyReply) 
 
     const accountUser = await prisma.accountUser.findFirst({
       where: { clerkId },
-      select: { accountId: true, role: true, clerkId: true, branchId: true },
+      select: {
+        accountId: true,
+        role: true,
+        clerkId: true,
+        branchId: true,
+        account: { select: { isProductAdmin: true } },
+      },
     })
 
     if (!accountUser) {
@@ -44,6 +51,7 @@ export async function requireAuth(request: FastifyRequest, reply: FastifyReply) 
       accountId: accountUser.accountId,
       role: accountUser.role,
       branchId: accountUser.branchId,
+      isProductAdmin: accountUser.account.isProductAdmin,
     }
   } catch {
     return reply.status(401).send({ error: 'Invalid token' })

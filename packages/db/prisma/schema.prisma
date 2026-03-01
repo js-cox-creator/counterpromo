@@ -26,20 +26,22 @@ model Account {
   plan            BillingPlan @default(free)
   stripeCustomerId String?    @unique
   stripeSubId     String?     @unique
+  isProductAdmin  Boolean     @default(false)
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
-  users          AccountUser[]
-  invites        Invite[]
-  brandKit       BrandKit?
-  promos         Promo[]
-  folders        PromoFolder[]
-  jobs           Job[]
-  assets         Asset[]
-  usage          UsageMonthly[]
-  branches       Branch[]
-  importMappings ImportMapping[]
-  snippets       ProductSnippet[]
+  users           AccountUser[]
+  invites         Invite[]
+  brandKit        BrandKit?
+  promos          Promo[]
+  folders         PromoFolder[]
+  jobs            Job[]
+  assets          Asset[]
+  usage           UsageMonthly[]
+  branches        Branch[]
+  importMappings  ImportMapping[]
+  snippets        ProductSnippet[]
+  customTemplates CustomTemplate[]
 
   @@map("accounts")
 }
@@ -142,6 +144,7 @@ model Promo {
   subhead     String?
   cta         String?
   templateId  String?
+  keywords    String[]
   status      PromoStatus @default(draft)
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
@@ -322,6 +325,23 @@ model Asset {
   branch  Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
 
   @@map("assets")
+}
+
+// ─── Custom Templates ─────────────────────────────────────────────────────────
+
+model CustomTemplate {
+  id          String   @id @default(cuid())
+  accountId   String?          // null = system template visible to all accounts
+  name        String
+  description String?
+  htmlContent String   @db.Text
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  account Account? @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@map("custom_templates")
 }
 
 // ─── Usage ────────────────────────────────────────────────────────────────────

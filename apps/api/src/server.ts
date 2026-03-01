@@ -16,6 +16,7 @@ import { coopRoutes } from './routes/coop.js'
 import { templateRoutes } from './routes/templates.js'
 import { folderRoutes } from './routes/folders.js'
 import { snippetRoutes } from './routes/snippets.js'
+import { customTemplateRoutes } from './routes/custom-templates.js'
 
 const app = Fastify({
   logger: {
@@ -58,6 +59,7 @@ await app.register(coopRoutes, { prefix: `${p}/coop` })
 await app.register(templateRoutes, { prefix: `${p}/templates` })
 await app.register(folderRoutes, { prefix: `${p}/folders` })
 await app.register(snippetRoutes, { prefix: `${p}/snippets` })
+await app.register(customTemplateRoutes, { prefix: `${p}/custom-templates` })
 
 const port = Number(process.env.PORT ?? 3001)
 const host = process.env.HOST ?? '0.0.0.0'

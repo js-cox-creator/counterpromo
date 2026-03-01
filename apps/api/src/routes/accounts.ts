@@ -21,6 +21,7 @@ export async function accountRoutes(app: FastifyInstance) {
         plan: true,
         stripeCustomerId: true,
         stripeSubId: true,
+        isProductAdmin: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -35,6 +36,7 @@ export async function accountRoutes(app: FastifyInstance) {
       currentUser: {
         clerkId,
         role,
+        isProductAdmin: account.isProductAdmin,
       },
     })
   })

@@ -6,11 +6,13 @@ export interface Account {
   plan: string
   stripeCustomerId: string | null
   stripeSubId: string | null
+  isProductAdmin: boolean
   createdAt: string
   updatedAt: string
   currentUser: {
     clerkId: string
     role: string
+    isProductAdmin: boolean
   }
 }
 
@@ -37,11 +39,23 @@ export interface Promo {
   subhead: string | null
   cta: string | null
   templateId: string | null
+  keywords: string[]
   status: string
   createdAt: string
   updatedAt: string
   itemCount?: number
   previewUrl?: string | null
+}
+
+export interface CustomTemplate {
+  id: string
+  accountId: string | null
+  name: string
+  description: string | null
+  htmlContent: string
+  isSystem: boolean
+  createdAt: string
+  updatedAt: string
 }
 
 export interface Usage {
@@ -231,7 +245,7 @@ export function apiClient(token: string) {
         })
       },
       get: (id: string) => request<Promo & { items: PromoItem[] }>(token, `/promos/${id}`, { method: 'GET' }),
-      patch: (id: string, data: { title?: string; subhead?: string | null; cta?: string | null; templateId?: string | null; folderId?: string | null; branchId?: string | null }) =>
+      patch: (id: string, data: { title?: string; subhead?: string | null; cta?: string | null; templateId?: string | null; folderId?: string | null; branchId?: string | null; keywords?: string[] }) =>
         request<Promo>(token, `/promos/${id}`, {
           method: 'PATCH',
           body: JSON.stringify(data),
@@ -406,6 +420,15 @@ export function apiClient(token: string) {
       update: (id: string, data: Partial<CreateSnippetData>) =>
         request<ProductSnippet>(token, `/snippets/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
       delete: (id: string) => request<{ ok: boolean }>(token, `/snippets/${id}`, { method: 'DELETE' }),
+    },
+    customTemplates: {
+      list: () => request<CustomTemplate[]>(token, '/custom-templates', { method: 'GET' }),
+      get: (id: string) => request<CustomTemplate>(token, `/custom-templates/${id}`, { method: 'GET' }),
+      create: (d: { name: string; description?: string; htmlContent: string; isSystem?: boolean }) =>
+        request<CustomTemplate>(token, '/custom-templates', { method: 'POST', body: JSON.stringify(d) }),
+      update: (id: string, d: Partial<{ name: string; description: string; htmlContent: string }>) =>
+        request<CustomTemplate>(token, `/custom-templates/${id}`, { method: 'PATCH', body: JSON.stringify(d) }),
+      delete: (id: string) => request<{ ok: boolean }>(token, `/custom-templates/${id}`, { method: 'DELETE' }),
     },
     folders: {
       list: () => request<PromoFolder[]>(token, '/folders', { method: 'GET' }),

@@ -3,7 +3,7 @@ import { prisma } from '@counterpromo/db'
 import { startJob, completeJob, failJob } from '../lib/job.js'
 import { uploadToS3 } from '../lib/s3.js'
 import { loadTemplateData } from '../templates/loader.js'
-import { renderTemplate } from '../templates/render.js'
+import { resolveAndRenderTemplate } from '../templates/render.js'
 import { renderHtmlToScreenshot } from '../lib/renderer.js'
 
 export async function handleRenderPreview(payload: RenderPreviewPayload): Promise<void> {
@@ -14,11 +14,15 @@ export async function handleRenderPreview(payload: RenderPreviewPayload): Promis
 
     const promo = await prisma.promo.findUnique({
       where: { id: payload.promoId },
-      select: { templateId: true },
+      select: { templateId: true, keywords: true },
     })
-    const templateId = promo?.templateId ?? 'classic'
 
-    const html = renderTemplate(templateId, data)
+    const html = await resolveAndRenderTemplate(
+      promo?.templateId,
+      data,
+      promo?.keywords ?? [],
+      payload.accountId,
+    )
 
     const pngBuffer = await renderHtmlToScreenshot(html)
 
