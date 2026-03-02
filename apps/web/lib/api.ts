@@ -19,6 +19,7 @@ export interface Account {
 export interface BootstrapResponse extends Omit<Account, 'stripeCustomerId' | 'stripeSubId'> {
   stripeCustomerId?: string | null
   stripeSubId?: string | null
+  onboardingCompleted: boolean
 }
 
 export interface PromoFolder {
@@ -231,10 +232,18 @@ async function request<T>(
 export function apiClient(token: string) {
   return {
     accounts: {
-      bootstrap: async (accountName?: string): Promise<{ data: BootstrapResponse; status: number }> => {
+      bootstrap: async (
+        accountName?: string,
+        opts?: { onboardingCompleted?: boolean },
+      ): Promise<{ data: BootstrapResponse; status: number }> => {
         return request<BootstrapResponse>(token, '/accounts/bootstrap', {
           method: 'POST',
-          body: JSON.stringify(accountName ? { accountName } : {}),
+          body: JSON.stringify({
+            ...(accountName ? { accountName } : {}),
+            ...(opts?.onboardingCompleted !== undefined
+              ? { onboardingCompleted: opts.onboardingCompleted }
+              : {}),
+          }),
         })
       },
       me: async (): Promise<{ data: Account; status: number }> => {

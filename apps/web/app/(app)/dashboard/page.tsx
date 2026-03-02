@@ -169,7 +169,7 @@ export default function DashboardPage() {
     return (localStorage.getItem('counterpromo.dashboard.view') as 'grid' | 'list') ?? 'grid'
   })
 
-  const { isNewAccount, isLoading: bootstrapLoading } = useBootstrap()
+  const { isNewAccount, isLoading: bootstrapLoading, error: bootstrapError } = useBootstrap()
 
   useEffect(() => {
     if (!bootstrapLoading && isNewAccount) {
@@ -299,6 +299,16 @@ export default function DashboardPage() {
           {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
             <Skeleton key={i} className="aspect-[3/4] w-full rounded-xl" />
           ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (bootstrapError) {
+    return (
+      <div className="p-8">
+        <div className="px-4 py-3 bg-red-50 text-red-700 rounded-lg text-sm">
+          Failed to connect to your account. Please refresh the page.
         </div>
       </div>
     )

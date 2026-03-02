@@ -8,6 +8,15 @@ const CreateAccountBody = z.object({
   name: z.string().min(1).max(255),
 })
 
+const accountSelect = {
+  id: true,
+  name: true,
+  plan: true,
+  onboardingCompleted: true,
+  createdAt: true,
+  updatedAt: true,
+} as const
+
 export async function accountRoutes(app: FastifyInstance) {
   // GET /accounts/me — return account + plan + current user role
   app.get('/me', { preHandler: requireAuth }, async (request, reply) => {
@@ -19,6 +28,7 @@ export async function accountRoutes(app: FastifyInstance) {
         id: true,
         name: true,
         plan: true,
+        onboardingCompleted: true,
         stripeCustomerId: true,
         stripeSubId: true,
         isProductAdmin: true,
@@ -44,18 +54,38 @@ export async function accountRoutes(app: FastifyInstance) {
   // POST /accounts/bootstrap — first-login handler.
   // Uses JWT-only auth (no AccountUser required). Idempotent: returns existing
   // account if one already exists for this clerkId.
+  // Body: { accountName?: string, onboardingCompleted?: boolean }
   app.post('/bootstrap', { preHandler: requireJwtAuth }, async (request, reply) => {
     const { clerkId } = request.jwtAuth
+    const { accountName, onboardingCompleted } = (request.body ?? {}) as {
+      accountName?: string
+      onboardingCompleted?: boolean
+    }
 
     // Return existing account if already bootstrapped
     const existing = await prisma.accountUser.findFirst({
       where: { clerkId },
-      include: {
-        account: { select: { id: true, name: true, plan: true, createdAt: true, updatedAt: true } },
-      },
+      include: { account: { select: accountSelect } },
     })
+
     if (existing) {
-      return reply.send({ ...existing.account, currentUser: { clerkId, role: existing.role } })
+      // Update name and/or onboardingCompleted if provided
+      const needsUpdate =
+        (accountName && accountName !== existing.account.name) ||
+        (onboardingCompleted === true && !existing.account.onboardingCompleted)
+
+      const account = needsUpdate
+        ? await prisma.account.update({
+            where: { id: existing.accountId },
+            data: {
+              ...(accountName && accountName !== existing.account.name ? { name: accountName } : {}),
+              ...(onboardingCompleted === true ? { onboardingCompleted: true } : {}),
+            },
+            select: accountSelect,
+          })
+        : existing.account
+
+      return reply.send({ ...account, currentUser: { clerkId, role: existing.role } })
     }
 
     // Fetch user info from Clerk to seed email + name
@@ -67,21 +97,19 @@ export async function accountRoutes(app: FastifyInstance) {
     const name =
       [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ').trim() || null
 
-    const { accountName } = (request.body ?? {}) as { accountName?: string }
-
     const account = await prisma.account.create({
       data: {
         name: accountName ?? name ?? email.split('@')[0] ?? 'My Account',
+        onboardingCompleted: false,
         users: { create: { clerkId, email, name, role: 'owner' } },
       },
-      select: { id: true, name: true, plan: true, createdAt: true, updatedAt: true },
+      select: accountSelect,
     })
 
     return reply.status(201).send({ ...account, currentUser: { clerkId, role: 'owner' } })
   })
 
   // POST /accounts — create account + owner AccountUser record
-  // Called on first sign-in if no account exists
   app.post('/', { preHandler: requireAuth }, async (request, reply) => {
     const parsed = CreateAccountBody.safeParse(request.body)
     if (!parsed.success) {
@@ -91,15 +119,6 @@ export async function accountRoutes(app: FastifyInstance) {
     const { name } = parsed.data
     const { clerkId, accountId } = request.auth
 
-    // Find the AccountUser to get email/name for creating a new account scenario.
-    // Note: requireAuth guarantees an AccountUser already exists. This route is for
-    // cases where the caller already has an accountUser but wants to create a fresh
-    // account — or in practice the POST /accounts is called before the user has any
-    // account (so requireAuth would reject). The spec says "called on first sign-in if
-    // no account exists", which means the client hits this BEFORE requireAuth can find
-    // an account. For now we implement it with auth as-is (matching the scaffold).
-    //
-    // Create account and owner AccountUser in a transaction
     const existingUser = await prisma.accountUser.findFirst({
       where: { clerkId, accountId },
       select: { email: true, name: true },
@@ -121,6 +140,7 @@ export async function accountRoutes(app: FastifyInstance) {
         id: true,
         name: true,
         plan: true,
+        onboardingCompleted: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -128,10 +148,7 @@ export async function accountRoutes(app: FastifyInstance) {
 
     return reply.status(201).send({
       ...account,
-      currentUser: {
-        clerkId,
-        role: 'owner',
-      },
+      currentUser: { clerkId, role: 'owner' },
     })
   })
 }

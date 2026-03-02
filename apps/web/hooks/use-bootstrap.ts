@@ -12,13 +12,19 @@ interface UseBootstrapResult {
 }
 
 export function useBootstrap(): UseBootstrapResult {
-  const { getToken } = useAuth()
+  const { getToken, isLoaded } = useAuth()
   const [account, setAccount] = useState<BootstrapResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
   const [isNewAccount, setIsNewAccount] = useState(false)
 
   useEffect(() => {
+    // Wait for Clerk to fully initialise before attempting to get a token.
+    // Without this guard, getToken() returns null on the first render after
+    // sign-up, causing bootstrap to throw and the dashboard to show "cannot
+    // load data" before redirecting to onboarding on the next refresh.
+    if (!isLoaded) return
+
     let cancelled = false
 
     async function run() {
@@ -28,10 +34,13 @@ export function useBootstrap(): UseBootstrapResult {
           throw new Error('No auth token available')
         }
         const client = apiClient(token)
-        const { data, status } = await client.accounts.bootstrap()
+        const { data } = await client.accounts.bootstrap()
         if (!cancelled) {
           setAccount(data)
-          setIsNewAccount(status === 201)
+          // Redirect to onboarding whenever it hasn't been completed,
+          // regardless of whether this is a brand-new account or a returning
+          // user who closed the browser mid-setup.
+          setIsNewAccount(!data.onboardingCompleted)
         }
       } catch (err) {
         if (!cancelled) {
@@ -49,7 +58,7 @@ export function useBootstrap(): UseBootstrapResult {
     return () => {
       cancelled = true
     }
-  }, [getToken])
+  }, [getToken, isLoaded])
 
   return { account, isLoading, error, isNewAccount }
 }

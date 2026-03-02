@@ -124,3 +124,22 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Hide Clerk "Secured by Clerk" branding on auth pages */
+.cl-footerBranding,
+.cl-internal-1dauvpw {
+  display: none !important;
+}
+
+/* Allow logo to grow to its natural size */
+.cl-logoBox,
+.cl-internal-nu1iui {
+  height: fit-content !important;
+  max-height: none !important;
+}
+
+.cl-logoImage,
+.cl-internal-nu1iui img {
+  height: 120px !important;
+  width: auto !important;
+}

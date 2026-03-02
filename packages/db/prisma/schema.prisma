@@ -21,14 +21,15 @@ enum BillingPlan {
 // ─── Accounts ─────────────────────────────────────────────────────────────────
 
 model Account {
-  id              String      @id @default(cuid())
-  name            String
-  plan            BillingPlan @default(free)
-  stripeCustomerId String?    @unique
-  stripeSubId     String?     @unique
-  isProductAdmin  Boolean     @default(false)
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  id                   String      @id @default(cuid())
+  name                 String
+  plan                 BillingPlan @default(free)
+  stripeCustomerId     String?     @unique
+  stripeSubId          String?     @unique
+  isProductAdmin       Boolean     @default(false)
+  onboardingCompleted  Boolean     @default(false)
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
 
   users           AccountUser[]
   invites         Invite[]

@@ -91,7 +91,7 @@ export async function brandKitRoutes(app: FastifyInstance) {
       },
     })
 
-    // Enqueue to SQS
+    // Enqueue to SQS (non-fatal — see lib/sqs.ts)
     await enqueueJob({
       type: JobType.BrandBootstrap,
       jobId: job.id,

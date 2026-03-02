@@ -1,4 +1,5 @@
 import * as cheerio from 'cheerio'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 import type { BrandBootstrapPayload } from '@counterpromo/shared'
 import { prisma } from '@counterpromo/db'
 import { startJob, completeJob, failJob } from '../lib/job.js'
@@ -196,6 +197,95 @@ async function uploadImageFromUrl(
   } catch {
     return undefined
   }
+}
+
+// ─── Branch Extraction ────────────────────────────────────────────────────────
+
+interface ExtractedBranch {
+  name: string
+  address: string | null
+  phone: string | null
+  email: string | null
+}
+
+/**
+ * Look for a "locations / branches / contact / find us" page link in the
+ * homepage HTML and return its resolved URL, or null if none found.
+ */
+function findLocationsPageUrl(
+  $: ReturnType<typeof cheerio.load>,
+  baseUrl: string,
+): string | null {
+  const PATTERN = /location|branch|store|find.?us|our.?store|contact|where.?we.?are/i
+  let found: string | null = null
+
+  $('a[href]').each((_, el) => {
+    if (found) return
+    const href = $(el).attr('href') ?? ''
+    const text = $(el).text().trim()
+    // Match href path or visible link text
+    if (PATTERN.test(href) || PATTERN.test(text)) {
+      try {
+        const resolved = new URL(href, baseUrl).href
+        // Stay on the same domain
+        if (new URL(resolved).hostname === new URL(baseUrl).hostname) {
+          found = resolved
+        }
+      } catch { /* ignore */ }
+    }
+  })
+
+  return found
+}
+
+/**
+ * Use Gemini to extract branch/location data from page text.
+ * Returns an empty array if Gemini is unavailable or returns nothing useful.
+ */
+async function extractBranchesWithGemini(
+  pageText: string,
+  companyName: string,
+): Promise<ExtractedBranch[]> {
+  const apiKey = process.env.GEMINI_API_KEY
+  if (!apiKey) return []
+
+  const truncated = pageText.slice(0, 10000)
+
+  const prompt = `You are extracting branch/store location data for "${companyName}" from website text.
+
+${truncated}
+
+Return ONLY a valid JSON array (no markdown, no explanation) of location objects. Each object must have:
+- "name": branch/store name or city name if no specific name is given
+- "address": full street address including city, state/county and postcode — null if not found
+- "phone": phone number as it appears on the page — null if not found
+- "email": email address — null if not found
+
+If there are no physical locations mentioned, return [].
+Cap the list at 10 entries.`
+
+  try {
+    const genAI = new GoogleGenerativeAI(apiKey)
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' })
+    const result = await model.generateContent(prompt)
+    const text = result.response.text().trim()
+    // Strip possible markdown code fences
+    const json = text.replace(/^```json?\s*/i, '').replace(/```\s*$/, '').trim()
+    const parsed = JSON.parse(json) as unknown
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .filter((e): e is ExtractedBranch => typeof e === 'object' && e !== null && typeof (e as ExtractedBranch).name === 'string')
+      .slice(0, 10)
+  } catch (err) {
+    console.warn('Branch extraction via Gemini failed (non-fatal):', err instanceof Error ? err.message : err)
+    return []
+  }
+}
+
+/** Strip HTML down to readable text, removing noise elements. */
+function htmlToText($: ReturnType<typeof cheerio.load>): string {
+  $('script, style, noscript, svg, img, picture, video, iframe, head').remove()
+  return $('body').text().replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim()
 }
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
@@ -443,6 +533,50 @@ export async function handleBrandBootstrap(payload: BrandBootstrapPayload): Prom
       },
     })
 
+    // ── Extract and create branches (only if account has none yet) ────────────
+    // Try to find a dedicated locations/contact page; fall back to homepage text
+    let locationsPageText = htmlToText($)
+    const locationsUrl = findLocationsPageUrl($, payload.url)
+    if (locationsUrl && locationsUrl !== payload.url) {
+      try {
+        const locRes = await fetch(locationsUrl, { signal: AbortSignal.timeout(10000) })
+        const locHtml = await locRes.text()
+        locationsPageText = htmlToText(cheerio.load(locHtml))
+      } catch {
+        // If the locations page fails, we already have homepage text
+      }
+    }
+
+    const account = await prisma.account.findUnique({
+      where: { id: payload.accountId },
+      select: { name: true },
+    })
+    const extractedBranches = await extractBranchesWithGemini(
+      locationsPageText,
+      account?.name ?? 'Main Branch',
+    )
+    let branchesCreated = 0
+
+    if (extractedBranches.length > 0) {
+      const existingCount = await prisma.branch.count({ where: { accountId: payload.accountId } })
+
+      if (existingCount === 0) {
+        const accountName = account?.name ?? 'Main Branch'
+
+        await prisma.branch.createMany({
+          data: extractedBranches.map((b) => ({
+            accountId: payload.accountId,
+            name: b.name || accountName,
+            address: b.address,
+            phone: b.phone,
+            email: b.email,
+          })),
+        })
+
+        branchesCreated = extractedBranches.length
+      }
+    }
+
     await completeJob(payload.jobId, {
       logoUrl,
       logoS3Key,
@@ -451,6 +585,7 @@ export async function handleBrandBootstrap(payload: BrandBootstrapPayload): Prom
       fonts: extractedFonts,
       websiteUrl: payload.url,
       strapline,
+      branchesCreated,
     })
   } catch (err) {
     await failJob(payload.jobId, err)

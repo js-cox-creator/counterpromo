@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { UserButton, useAuth } from '@clerk/nextjs'
 import { useQuery } from '@tanstack/react-query'
@@ -39,9 +40,18 @@ export function Sidebar() {
 
   return (
     <aside className="fixed left-0 top-0 h-screen w-56 bg-slate-900 text-white flex flex-col z-10">
-      {/* Logo / App name */}
-      <div className="px-4 py-5 border-b border-slate-700">
-        <span className="text-lg font-bold tracking-tight text-white">CounterPromo</span>
+      {/* Logo — 90% width, top/bottom 25% cropped via 3:1 aspect-ratio container */}
+      <div className="px-2 py-1 border-b border-slate-700 flex items-center">
+        <div className="relative w-[90%] overflow-hidden" style={{ aspectRatio: '3/1' }}>
+          <Image
+            src="/logo.png"
+            alt="CounterPromo"
+            fill
+            sizes="200px"
+            priority
+            className="brightness-0 invert object-cover object-center"
+          />
+        </div>
       </div>
 
       {/* Nav links */}
