@@ -337,6 +337,12 @@ export function apiClient(token: string) {
           `/promos/${id}/assets`,
           { method: 'GET' },
         ),
+      getPreviewHtml: (id: string, branchId?: string) =>
+        request<{ html: string | null }>(
+          token,
+          `/promos/${id}/preview-html${branchId ? `?branchId=${branchId}` : ''}`,
+          { method: 'GET' },
+        ),
     },
     jobs: {
       get: (jobId: string) =>

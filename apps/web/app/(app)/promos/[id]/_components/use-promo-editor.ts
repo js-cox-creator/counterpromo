@@ -177,6 +177,21 @@ export function usePromoEditor(id: string) {
   })
   const assets = assetsData?.data ?? []
 
+  const { data: previewHtmlData, refetch: refetchPreviewHtml } = useQuery({
+    queryKey: ['promo-preview-html', id],
+    queryFn: async () => {
+      const token = await getToken()
+      return apiClient(token!).promos.getPreviewHtml(id)
+    },
+    enabled: Boolean(id),
+    staleTime: 0,
+  })
+  const previewHtml = previewHtmlData?.data?.html ?? null
+
+  function refreshPreview() {
+    void queryClient.invalidateQueries({ queryKey: ['promo-preview-html', id] })
+  }
+
   const { data: snippetsData } = useQuery({
     queryKey: ['snippets'],
     queryFn: async () => {
@@ -266,6 +281,7 @@ export function usePromoEditor(id: string) {
           setUploadState('done')
           setParseJobId(null)
           void queryClient.invalidateQueries({ queryKey: ['promo', id] })
+          refreshPreview()
           clearInterval(interval)
         } else if (job.status === 'failed') {
           setUploadState('error')
@@ -288,6 +304,7 @@ export function usePromoEditor(id: string) {
         const job = res.data
         if (job.status === 'completed' || job.status === 'done') {
           void queryClient.invalidateQueries({ queryKey: ['promo', id] })
+          refreshPreview()
           setUrlScrapeState('done')
           setUrlScrapeJobId(null)
           setUrlInputVisible(false)
@@ -495,6 +512,7 @@ export function usePromoEditor(id: string) {
     try {
       const token = await getToken()
       await apiClient(token!).promos.patch(id, { templateId })
+      refreshPreview()
     } catch {
       // silently fail
     } finally {
@@ -507,6 +525,7 @@ export function usePromoEditor(id: string) {
       const token = await getToken()
       await apiClient(token!).promos.patch(id, patch)
       void queryClient.invalidateQueries({ queryKey: ['promo', id] })
+      refreshPreview()
     } catch { /* silently fail */ }
   }
 
@@ -632,6 +651,7 @@ export function usePromoEditor(id: string) {
 
       await client.promos.bulkItems(id, newItems)
       await queryClient.invalidateQueries({ queryKey: ['promo', id] })
+      refreshPreview()
       setDialogOpen(false)
       resetAddItemDialog()
     } catch {
@@ -644,6 +664,7 @@ export function usePromoEditor(id: string) {
       if (!old) return old
       return { ...old, data: { ...old.data, items: old.data.items.filter((item: PromoItem) => item.id !== itemId) } }
     })
+    refreshPreview()
     try {
       const token = await getToken()
       await apiClient(token!).promos.deleteItem(id, itemId)
@@ -750,6 +771,7 @@ export function usePromoEditor(id: string) {
       const token = await getToken()
       await apiClient(token!).promos.itemFromSnippet(id, snippet.id)
       void queryClient.invalidateQueries({ queryKey: ['promo', id] })
+      refreshPreview()
       setSnippetsPopoverOpen(false)
     } catch { /* silently fail */ } finally {
       setAddingSnippetId(null)
@@ -855,6 +877,7 @@ export function usePromoEditor(id: string) {
     // queries
     promo, isLoading, error,
     assets,
+    previewHtml,
     snippets, branches, importMappings,
     coopItems, coopReportAssetData,
     // template state

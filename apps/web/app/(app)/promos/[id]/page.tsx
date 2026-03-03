@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -34,6 +34,56 @@ function statusBadgeClass(status: string): string {
 }
 
 type ViewportTab = 'flyer' | 'social' | 'email'
+
+// ---------------------------------------------------------------------------
+// Live HTML preview — scales the iframe to fit the available container
+// ---------------------------------------------------------------------------
+
+function LiveHtmlPreview({ html }: { html: string }) {
+  // Most flyer templates target A4 portrait at 96dpi ≈ 794×1123px
+  const TEMPLATE_W = 794
+  const TEMPLATE_H = 1123
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [scale, setScale] = useState(1)
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const update = () => {
+      const { width, height } = el.getBoundingClientRect()
+      const s = Math.min((width - 32) / TEMPLATE_W, (height - 32) / TEMPLATE_H, 1)
+      setScale(s)
+    }
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  return (
+    <div ref={containerRef} className="flex-1 flex items-center justify-center w-full h-full overflow-hidden">
+      <div
+        style={{
+          width: TEMPLATE_W,
+          height: TEMPLATE_H,
+          transform: `scale(${scale})`,
+          transformOrigin: 'center center',
+          flexShrink: 0,
+          boxShadow: '0 4px 32px rgba(0,0,0,0.18)',
+          borderRadius: 8,
+          overflow: 'hidden',
+        }}
+      >
+        <iframe
+          srcDoc={html}
+          style={{ width: TEMPLATE_W, height: TEMPLATE_H, border: 'none', display: 'block' }}
+          sandbox="allow-same-origin"
+          title="Live preview"
+        />
+      </div>
+    </div>
+  )
+}
 
 // ---------------------------------------------------------------------------
 // Page
@@ -216,7 +266,11 @@ export default function PromoEditorPage() {
             )}
 
             {activeTab === 'flyer' && (
-              previewAsset ? (
+              editor.previewHtml ? (
+                // Live HTML preview (custom templates)
+                <LiveHtmlPreview html={editor.previewHtml} />
+              ) : previewAsset ? (
+                // Rendered image fallback (built-in templates)
                 <img
                   src={previewAsset.url}
                   alt={promo.title}

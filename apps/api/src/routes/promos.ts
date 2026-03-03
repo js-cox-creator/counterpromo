@@ -1,10 +1,206 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
+import * as cheerio from 'cheerio'
 import { prisma } from '@counterpromo/db'
 import { BillingPlan, JobType, PLAN_LIMITS } from '@counterpromo/shared'
 import { requireAuth } from '../middleware/auth.js'
 import { getUploadPresignedUrl, getAssetSignedUrl } from '../lib/s3.js'
 import { enqueueJob } from '../lib/sqs.js'
+
+// ---------------------------------------------------------------------------
+// Live preview HTML generation (custom templates only, no AI gen)
+// ---------------------------------------------------------------------------
+
+function toNumber(price: unknown): number {
+  const n = typeof price === 'object' && price !== null && 'toNumber' in price
+    ? (price as { toNumber(): number }).toNumber()
+    : Number(price)
+  return isNaN(n) ? 0 : n
+}
+
+function formatPrice(price: unknown): string {
+  const n = toNumber(price)
+  return `$${n.toFixed(2)}`
+}
+
+function wholeOf(formatted: string): string {
+  return formatted.replace('$', '').split('.')[0] ?? '0'
+}
+
+function centsOf(formatted: string): string {
+  return formatted.replace('$', '').split('.')[1] ?? '00'
+}
+
+function injectColor($: cheerio.CheerioAPI, selector: string, prop: string, value: string) {
+  $(selector).each((_i, el) => {
+    const existing = $(el).attr('style') ?? ''
+    const sep = existing && !existing.trim().endsWith(';') ? '; ' : ''
+    $(el).attr('style', `${existing}${sep}${prop}: ${value};`)
+  })
+}
+
+async function buildPreviewHtml(promoId: string, accountId: string, branchId?: string): Promise<string | null> {
+  const [promo, brandKit, account, branch] = await Promise.all([
+    prisma.promo.findFirst({
+      where: { id: promoId, accountId },
+      include: { items: { orderBy: { sortOrder: 'asc' } } },
+    }),
+    prisma.brandKit.findUnique({ where: { accountId } }),
+    prisma.account.findUnique({ where: { id: accountId }, select: { name: true } }),
+    branchId ? prisma.branch.findFirst({ where: { id: branchId, accountId } }) : Promise.resolve(null),
+  ])
+
+  if (!promo?.templateId) return null
+
+  const custom = await prisma.customTemplate.findFirst({
+    where: { id: promo.templateId, OR: [{ accountId }, { isSystem: true }] },
+  })
+  if (!custom) return null
+
+  const colors = (brandKit?.colors ?? []) as string[]
+  const primaryColor = colors[0] ?? '#1a1a2e'
+  const secondaryColor = colors[1] ?? '#e94560'
+  const resolvedCta = promo.cta || branch?.cta || null
+
+  const items = promo.items.map(item => {
+    const priceFormatted = formatPrice(item.price)
+    const rrpRaw = item.rrp ? toNumber(item.rrp) : null
+    const saleRaw = toNumber(item.price)
+    const rrpFormatted = rrpRaw !== null ? `$${rrpRaw.toFixed(2)}` : null
+    const hasRrp = rrpRaw !== null && rrpRaw > saleRaw
+    const discountPercent = hasRrp && rrpRaw
+      ? String(Math.round((1 - saleRaw / rrpRaw) * 100))
+      : null
+
+    return {
+      name: item.name,
+      price: priceFormatted,
+      priceWhole: wholeOf(priceFormatted),
+      priceCents: centsOf(priceFormatted),
+      rrp: rrpFormatted,
+      rrpWhole: rrpFormatted ? wholeOf(rrpFormatted) : null,
+      rrpCents: rrpFormatted ? centsOf(rrpFormatted) : null,
+      discountPercent,
+      hasRrp,
+      sku: item.sku,
+      unit: item.unit,
+      category: item.category,
+      vendor: item.vendor,
+      imageUrl: item.imageUrl,
+    }
+  })
+
+  const brand = {
+    logoUrl: brandKit?.logoUrl ?? null,
+    primaryColor,
+    secondaryColor,
+    name: account?.name ?? 'My Company',
+    strapline: brandKit?.strapline ?? null,
+    websiteUrl: brandKit?.websiteUrl ?? null,
+    aiDescription: brandKit?.aiDescription ?? null,
+  }
+
+  const $ = cheerio.load(custom.htmlContent)
+
+  // Colours
+  injectColor($, '.counterpromo-bg-primary', 'background-color', brand.primaryColor)
+  injectColor($, '.counterpromo-bg-secondary', 'background-color', brand.secondaryColor)
+  injectColor($, '.counterpromo-text-primary', 'color', brand.primaryColor)
+  injectColor($, '.counterpromo-text-secondary', 'color', brand.secondaryColor)
+  injectColor($, '.counterpromo-border-primary', 'border-color', brand.primaryColor)
+  injectColor($, '.counterpromo-border-secondary', 'border-color', brand.secondaryColor)
+
+  // Brand slots
+  $('.counterpromo-brand-name').text(brand.name)
+  if (brand.logoUrl) {
+    $('.counterpromo-brand-logo').attr('src', brand.logoUrl)
+  } else {
+    $('.counterpromo-brand-logo').remove()
+  }
+  if (brand.strapline) {
+    $('.counterpromo-brand-strapline').text(brand.strapline)
+  } else {
+    $('.counterpromo-brand-strapline').remove()
+  }
+  if (brand.aiDescription) {
+    $('.counterpromo-brand-description').text(brand.aiDescription)
+  } else {
+    $('.counterpromo-brand-description').remove()
+  }
+  if (brand.websiteUrl) {
+    $('.counterpromo-brand-website').text(brand.websiteUrl)
+  } else {
+    $('.counterpromo-brand-website').remove()
+  }
+
+  // Promo slots
+  $('.counterpromo-promo-title').text(promo.title)
+  if (promo.subhead) {
+    $('.counterpromo-promo-subhead').text(promo.subhead)
+  } else {
+    $('.counterpromo-promo-subhead').remove()
+  }
+  $('.counterpromo-promo-cta').text(resolvedCta ?? 'Contact us today')
+
+  // Branch slots
+  if (branch) {
+    $('.counterpromo-branch-name').text(branch.name)
+    $('.counterpromo-branch-phone').text(branch.phone ?? '')
+    $('.counterpromo-branch-email').text(branch.email ?? '')
+    $('.counterpromo-branch-address').text(branch.address ?? '')
+  }
+
+  // Conditionals
+  if (!brand.logoUrl) $('.counterpromo-if-logo').remove()
+  if (!branch) $('.counterpromo-if-branch').remove()
+  if (!promo.subhead) $('.counterpromo-if-subhead').remove()
+  if (!brand.strapline) $('.counterpromo-if-strapline').remove()
+  if (!brand.aiDescription) $('.counterpromo-if-description').remove()
+
+  // Product repeater
+  const productTemplate = $('.counterpromo-product').first()
+  if (productTemplate.length && items.length > 0) {
+    const parent = productTemplate.parent()
+    for (const item of items) {
+      const clone = productTemplate.clone()
+      clone.find('.counterpromo-product-name').text(item.name)
+      clone.find('.counterpromo-product-price').text(item.price)
+      clone.find('.counterpromo-product-price-whole').text(item.priceWhole)
+      clone.find('.counterpromo-product-price-cents').text(item.priceCents)
+      if (item.rrp) {
+        clone.find('.counterpromo-product-rrp').text(item.rrp)
+        clone.find('.counterpromo-product-rrp-whole').text(item.rrpWhole ?? '')
+        clone.find('.counterpromo-product-rrp-cents').text(item.rrpCents ?? '')
+      } else {
+        clone.find('.counterpromo-product-rrp').remove()
+        clone.find('.counterpromo-product-rrp-whole').remove()
+        clone.find('.counterpromo-product-rrp-cents').remove()
+      }
+      if (item.discountPercent) {
+        clone.find('.counterpromo-product-discount-percent').text(`${item.discountPercent}%`)
+      } else {
+        clone.find('.counterpromo-product-discount-percent').remove()
+      }
+      if (!item.hasRrp) clone.find('.counterpromo-if-rrp').remove()
+      if (item.imageUrl) {
+        clone.find('.counterpromo-product-image').attr('src', item.imageUrl)
+      } else {
+        clone.find('.counterpromo-product-image').remove()
+      }
+      clone.find('.counterpromo-product-category').text(item.category ?? '')
+      clone.find('.counterpromo-product-vendor').text(item.vendor ?? '')
+      clone.find('.counterpromo-product-sku').text(item.sku ?? '')
+      clone.find('.counterpromo-product-unit').text(item.unit ?? '')
+      parent.append(clone)
+    }
+    productTemplate.remove()
+  }
+
+  // Skip AI gen elements in preview (leave placeholder text as-is)
+  // $('.counterpromo-gen') — intentionally left unchanged
+
+  return $.html()
+}
 
 const CreatePromoBody = z.object({
   title: z.string().min(1).max(255),
@@ -835,5 +1031,15 @@ export async function promoRoutes(app: FastifyInstance) {
     )
 
     return reply.send(assetsWithUrls)
+  })
+
+  // GET /promos/:id/preview-html — returns processed HTML for custom templates (no AI gen)
+  app.get('/:id/preview-html', { preHandler: requireAuth }, async (request, reply) => {
+    const { accountId } = request.auth
+    const { id } = request.params as { id: string }
+    const query = request.query as { branchId?: string }
+
+    const html = await buildPreviewHtml(id, accountId, query.branchId)
+    return reply.send({ html })
   })
 }
