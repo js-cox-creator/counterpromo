@@ -104,7 +104,7 @@ export default function PromoEditorPage() {
   const hasAnyAsset = Boolean(previewAsset ?? pdfAsset ?? socialAsset)
 
   return (
-    <div className="flex flex-col" style={{ height: 'calc(100vh - 64px)' }}>
+    <div className="flex flex-col h-screen">
 
       {/* ------------------------------------------------------------------ */}
       {/* Header bar                                                          */}
