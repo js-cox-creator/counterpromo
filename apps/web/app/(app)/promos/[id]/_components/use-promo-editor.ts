@@ -51,10 +51,41 @@ export function usePromoEditor(id: string) {
 
   // ----- Add item dialog state -----
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [editingItemId, setEditingItemId] = useState<string | null>(null)
   const [itemName, setItemName] = useState('')
-  const [itemPrice, setItemPrice] = useState('')
+  const [itemPrice, _setItemPrice] = useState('')
+  const [itemRrp, _setItemRrp] = useState('')
+  const [itemDiscount, _setItemDiscount] = useState('')
   const [itemSku, setItemSku] = useState('')
   const [itemUnit, setItemUnit] = useState('')
+
+  // Wrapped setters with cross-field auto-calc
+  function setItemRrp(val: string) {
+    _setItemRrp(val)
+    const rrp = parseFloat(val)
+    const disc = parseFloat(itemDiscount)
+    if (!isNaN(rrp) && !isNaN(disc) && rrp > 0) {
+      _setItemPrice((rrp * (1 - disc / 100)).toFixed(2))
+    }
+  }
+
+  function setItemDiscount(val: string) {
+    _setItemDiscount(val)
+    const rrp = parseFloat(itemRrp)
+    const disc = parseFloat(val)
+    if (!isNaN(rrp) && !isNaN(disc) && rrp > 0) {
+      _setItemPrice((rrp * (1 - disc / 100)).toFixed(2))
+    }
+  }
+
+  function setItemPrice(val: string) {
+    _setItemPrice(val)
+    const rrp = parseFloat(itemRrp)
+    const price = parseFloat(val)
+    if (!isNaN(rrp) && !isNaN(price) && rrp > 0 && price < rrp) {
+      _setItemDiscount(((1 - price / rrp) * 100).toFixed(1))
+    }
+  }
   const [addingItem, setAddingItem] = useState(false)
 
   // ----- Render / export state -----
@@ -520,11 +551,25 @@ export function usePromoEditor(id: string) {
     }
   }
 
+  function openEditItemDialog(item: PromoItem) {
+    setEditingItemId(item.id)
+    setItemName(item.name)
+    _setItemPrice(parseFloat(String(item.price)).toFixed(2))
+    _setItemRrp(item.rrp ? parseFloat(String(item.rrp)).toFixed(2) : '')
+    _setItemDiscount('')
+    setItemSku(item.sku ?? '')
+    setItemUnit(item.unit ?? '')
+    setDialogOpen(true)
+  }
+
   function resetAddItemDialog() {
     setItemName('')
-    setItemPrice('')
+    _setItemPrice('')
+    _setItemRrp('')
+    _setItemDiscount('')
     setItemSku('')
     setItemUnit('')
+    setEditingItemId(null)
     setAddingItem(false)
   }
 
@@ -536,25 +581,55 @@ export function usePromoEditor(id: string) {
       const token = await getToken()
       const client = apiClient(token!)
       const currentItems = promo?.items ?? []
-      const newItems = [
-        ...currentItems.map((item) => ({
-          name: item.name,
-          price: parseFloat(String(item.price)),
-          sku: item.sku ?? undefined,
-          unit: item.unit ?? undefined,
-          category: item.category ?? undefined,
-          vendor: item.vendor ?? undefined,
-          imageUrl: item.imageUrl ?? undefined,
-          sortOrder: item.sortOrder,
-        })),
-        {
-          name: itemName.trim(),
-          price: parseFloat(itemPrice),
-          sku: itemSku.trim() || undefined,
-          unit: itemUnit.trim() || undefined,
-          sortOrder: currentItems.length,
-        },
-      ]
+
+      const newItems = editingItemId
+        ? currentItems.map((item) =>
+            item.id === editingItemId
+              ? {
+                  name: itemName.trim(),
+                  price: parseFloat(itemPrice),
+                  rrp: itemRrp.trim() ? parseFloat(itemRrp) : undefined,
+                  sku: itemSku.trim() || undefined,
+                  unit: itemUnit.trim() || undefined,
+                  category: item.category ?? undefined,
+                  vendor: item.vendor ?? undefined,
+                  imageUrl: item.imageUrl ?? undefined,
+                  sortOrder: item.sortOrder,
+                }
+              : {
+                  name: item.name,
+                  price: parseFloat(String(item.price)),
+                  rrp: item.rrp ? parseFloat(String(item.rrp)) : undefined,
+                  sku: item.sku ?? undefined,
+                  unit: item.unit ?? undefined,
+                  category: item.category ?? undefined,
+                  vendor: item.vendor ?? undefined,
+                  imageUrl: item.imageUrl ?? undefined,
+                  sortOrder: item.sortOrder,
+                },
+          )
+        : [
+            ...currentItems.map((item) => ({
+              name: item.name,
+              price: parseFloat(String(item.price)),
+              rrp: item.rrp ? parseFloat(String(item.rrp)) : undefined,
+              sku: item.sku ?? undefined,
+              unit: item.unit ?? undefined,
+              category: item.category ?? undefined,
+              vendor: item.vendor ?? undefined,
+              imageUrl: item.imageUrl ?? undefined,
+              sortOrder: item.sortOrder,
+            })),
+            {
+              name: itemName.trim(),
+              price: parseFloat(itemPrice),
+              rrp: itemRrp.trim() ? parseFloat(itemRrp) : undefined,
+              sku: itemSku.trim() || undefined,
+              unit: itemUnit.trim() || undefined,
+              sortOrder: currentItems.length,
+            },
+          ]
+
       await client.promos.bulkItems(id, newItems)
       await queryClient.invalidateQueries({ queryKey: ['promo', id] })
       setDialogOpen(false)
@@ -650,7 +725,7 @@ export function usePromoEditor(id: string) {
       const token = await getToken()
       await apiClient(token!).snippets.create({
         name: item.name,
-        price: parseFloat(String(item.price)),
+        price: item.rrp ? parseFloat(String(item.rrp)) : parseFloat(String(item.price)),
         sku: item.sku ?? undefined,
         unit: item.unit ?? undefined,
         category: item.category ?? undefined,
@@ -798,8 +873,12 @@ export function usePromoEditor(id: string) {
     setUploadState, setUploadError,
     // dialog state
     dialogOpen, setDialogOpen,
+    editingItemId,
+    openEditItemDialog,
     itemName, setItemName,
     itemPrice, setItemPrice,
+    itemRrp, setItemRrp,
+    itemDiscount, setItemDiscount,
     itemSku, setItemSku,
     itemUnit, setItemUnit,
     addingItem,

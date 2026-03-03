@@ -107,6 +107,7 @@ export interface PromoItem {
   sku: string | null
   name: string
   price: string
+  rrp: string | null
   unit: string | null
   category: string | null
   vendor: string | null
@@ -287,6 +288,7 @@ export function apiClient(token: string) {
         items: Array<{
           name: string
           price: number
+          rrp?: number
           sku?: string
           unit?: string
           category?: string

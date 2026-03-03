@@ -40,7 +40,7 @@ export default function SnippetsPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [formName, setFormName] = useState('')
-  const [formPrice, setFormPrice] = useState('')
+  const [formRrp, setFormRrp] = useState('')
   const [formSku, setFormSku] = useState('')
   const [formUnit, setFormUnit] = useState('')
   const [formCategory, setFormCategory] = useState('')
@@ -57,7 +57,7 @@ export default function SnippetsPage() {
   function openNewDialog() {
     setEditingId(null)
     setFormName('')
-    setFormPrice('')
+    setFormRrp('')
     setFormSku('')
     setFormUnit('')
     setFormCategory('')
@@ -69,7 +69,7 @@ export default function SnippetsPage() {
   function openEditDialog(snippet: ProductSnippet) {
     setEditingId(snippet.id)
     setFormName(snippet.name)
-    setFormPrice(parseFloat(String(snippet.price)).toFixed(2))
+    setFormRrp(parseFloat(String(snippet.price)).toFixed(2))
     setFormSku(snippet.sku ?? '')
     setFormUnit(snippet.unit ?? '')
     setFormCategory(snippet.category ?? '')
@@ -89,9 +89,9 @@ export default function SnippetsPage() {
       setSaveError('Name is required.')
       return
     }
-    const priceNum = parseFloat(formPrice)
-    if (!formPrice || isNaN(priceNum) || priceNum < 0) {
-      setSaveError('A valid price is required.')
+    const rrpNum = parseFloat(formRrp)
+    if (!formRrp || isNaN(rrpNum) || rrpNum < 0) {
+      setSaveError('A valid RRP / MSRP is required.')
       return
     }
 
@@ -100,7 +100,7 @@ export default function SnippetsPage() {
 
     const data: CreateSnippetData = {
       name: formName.trim(),
-      price: priceNum,
+      price: rrpNum,
       sku: formSku.trim() || undefined,
       unit: formUnit.trim() || undefined,
       category: formCategory.trim() || undefined,
@@ -191,7 +191,7 @@ export default function SnippetsPage() {
             <thead className="bg-slate-50 border-b border-slate-100">
               <tr>
                 <th className="text-left px-4 py-2.5 font-medium text-slate-600">Name</th>
-                <th className="text-left px-4 py-2.5 font-medium text-slate-600">Price</th>
+                <th className="text-left px-4 py-2.5 font-medium text-slate-600">RRP / MSRP</th>
                 <th className="text-left px-4 py-2.5 font-medium text-slate-600">SKU</th>
                 <th className="text-left px-4 py-2.5 font-medium text-slate-600">Unit</th>
                 <th className="text-left px-4 py-2.5 font-medium text-slate-600">Category</th>
@@ -253,14 +253,14 @@ export default function SnippetsPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="snippet-price">Price *</Label>
+              <Label htmlFor="snippet-rrp">RRP / MSRP *</Label>
               <Input
-                id="snippet-price"
+                id="snippet-rrp"
                 type="number"
                 step="0.01"
                 min="0"
-                value={formPrice}
-                onChange={(e) => setFormPrice(e.target.value)}
+                value={formRrp}
+                onChange={(e) => setFormRrp(e.target.value)}
                 placeholder="e.g. 9.99"
               />
             </div>

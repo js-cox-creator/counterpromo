@@ -60,7 +60,7 @@ export async function processCustomTemplate(
   injectColor($, '.counterpromo-border-primary', 'border-color', data.brand.primaryColor)
   injectColor($, '.counterpromo-border-secondary', 'border-color', data.brand.secondaryColor)
 
-  // 2. Text / image slots
+  // 2. Text / image slots — brand
   $('.counterpromo-brand-name').text(data.brand.name)
 
   if (data.brand.logoUrl) {
@@ -69,6 +69,25 @@ export async function processCustomTemplate(
     $('.counterpromo-brand-logo').remove()
   }
 
+  if (data.brand.strapline) {
+    $('.counterpromo-brand-strapline').text(data.brand.strapline)
+  } else {
+    $('.counterpromo-brand-strapline').remove()
+  }
+
+  if (data.brand.aiDescription) {
+    $('.counterpromo-brand-description').text(data.brand.aiDescription)
+  } else {
+    $('.counterpromo-brand-description').remove()
+  }
+
+  if (data.brand.websiteUrl) {
+    $('.counterpromo-brand-website').text(data.brand.websiteUrl)
+  } else {
+    $('.counterpromo-brand-website').remove()
+  }
+
+  // 2b. Text / image slots — promo
   $('.counterpromo-promo-title').text(data.promo.title)
 
   if (data.promo.subhead) {
@@ -79,6 +98,7 @@ export async function processCustomTemplate(
 
   $('.counterpromo-promo-cta').text(data.promo.cta ?? 'Contact us today')
 
+  // 2c. Text slots — branch
   if (data.branch) {
     $('.counterpromo-branch-name').text(data.branch.name)
     $('.counterpromo-branch-phone').text(data.branch.phone ?? '')
@@ -87,15 +107,11 @@ export async function processCustomTemplate(
   }
 
   // 3. Conditionals
-  if (!data.brand.logoUrl) {
-    $('.counterpromo-if-logo').remove()
-  }
-  if (!data.branch) {
-    $('.counterpromo-if-branch').remove()
-  }
-  if (!data.promo.subhead) {
-    $('.counterpromo-if-subhead').remove()
-  }
+  if (!data.brand.logoUrl) $('.counterpromo-if-logo').remove()
+  if (!data.branch) $('.counterpromo-if-branch').remove()
+  if (!data.promo.subhead) $('.counterpromo-if-subhead').remove()
+  if (!data.brand.strapline) $('.counterpromo-if-strapline').remove()
+  if (!data.brand.aiDescription) $('.counterpromo-if-description').remove()
 
   // 4. Product repeater
   const productTemplate = $('.counterpromo-product').first()
@@ -106,9 +122,32 @@ export async function processCustomTemplate(
       const clone = productTemplate.clone()
 
       clone.find('.counterpromo-product-name').text(item.name)
-      clone.find('.counterpromo-product-price').text(formatPrice(item.price))
-      clone.find('.counterpromo-product-price-whole').text(priceWhole(item.price))
-      clone.find('.counterpromo-product-price-cents').text(priceCents(item.price))
+
+      // Sale price
+      clone.find('.counterpromo-product-price').text(item.price)
+      clone.find('.counterpromo-product-price-whole').text(item.priceWhole)
+      clone.find('.counterpromo-product-price-cents').text(item.priceCents)
+
+      // RRP / MSRP
+      if (item.rrp) {
+        clone.find('.counterpromo-product-rrp').text(item.rrp)
+        clone.find('.counterpromo-product-rrp-whole').text(item.rrpWhole ?? '')
+        clone.find('.counterpromo-product-rrp-cents').text(item.rrpCents ?? '')
+      } else {
+        clone.find('.counterpromo-product-rrp').remove()
+        clone.find('.counterpromo-product-rrp-whole').remove()
+        clone.find('.counterpromo-product-rrp-cents').remove()
+      }
+
+      // Discount percent
+      if (item.discountPercent) {
+        clone.find('.counterpromo-product-discount-percent').text(`${item.discountPercent}%`)
+      } else {
+        clone.find('.counterpromo-product-discount-percent').remove()
+      }
+
+      // Conditional blocks inside product
+      if (!item.hasRrp) clone.find('.counterpromo-if-rrp').remove()
 
       if (item.imageUrl) {
         clone.find('.counterpromo-product-image').attr('src', item.imageUrl)

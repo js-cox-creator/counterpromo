@@ -170,6 +170,7 @@ model PromoItem {
   sku         String?
   name        String
   price       Decimal  @db.Decimal(10, 2)
+  rrp         Decimal? @db.Decimal(10, 2)
   unit        String?
   category    String?
   vendor      String?

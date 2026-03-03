@@ -3,7 +3,7 @@
 import { useState, useRef, KeyboardEvent } from 'react'
 import {
   ChevronDown, ChevronUp, Upload, Plus, Trash2, Link as LinkIcon,
-  Bookmark, BookmarkCheck, GitBranch, DollarSign, Copy, X,
+  Bookmark, BookmarkCheck, GitBranch, DollarSign, Copy, X, Pencil,
 } from 'lucide-react'
 import { type Promo, type PromoItem, type ProductSnippet, type Branch, type ImportMapping } from '@/lib/api'
 import { Button } from '@/components/ui/button'
@@ -97,6 +97,7 @@ interface RightPanelProps {
   savedItemIds: Set<string>
   handleDeleteItem: (id: string) => void
   handleSaveAsSnippet: (item: PromoItem) => void
+  openEditItemDialog: (item: PromoItem) => void
   setDialogOpen: (v: boolean) => void
 
   // branch
@@ -233,6 +234,7 @@ export function RightPanel({
   savedItemIds,
   handleDeleteItem,
   handleSaveAsSnippet,
+  openEditItemDialog,
   setDialogOpen,
   selectedBranchId, branchSaving,
   handleBranchChange,
@@ -546,11 +548,22 @@ export function RightPanel({
                   <p className="text-xs font-medium text-slate-900 truncate">{item.name}</p>
                   <p className="text-[10px] text-slate-500">
                     ${formatPrice(item.price)}
+                    {item.rrp && (
+                      <span className="ml-1 line-through text-slate-400">${formatPrice(item.rrp)}</span>
+                    )}
                     {item.unit ? ` / ${item.unit}` : ''}
                     {item.sku ? ` · ${item.sku}` : ''}
                   </p>
                 </div>
                 <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => openEditItemDialog(item)}
+                    className="p-1 rounded text-slate-300 hover:text-slate-600 transition-colors"
+                    aria-label="Edit item"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
                   <button
                     type="button"
                     onClick={() => void handleSaveAsSnippet(item)}

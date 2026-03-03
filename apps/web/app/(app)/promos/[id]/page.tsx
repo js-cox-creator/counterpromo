@@ -457,6 +457,7 @@ export default function PromoEditorPage() {
           savedItemIds={editor.savedItemIds}
           handleDeleteItem={editor.handleDeleteItem}
           handleSaveAsSnippet={editor.handleSaveAsSnippet}
+          openEditItemDialog={editor.openEditItemDialog}
           setDialogOpen={editor.setDialogOpen}
           selectedBranchId={editor.selectedBranchId}
           branchSaving={editor.branchSaving}
@@ -492,7 +493,7 @@ export default function PromoEditorPage() {
       }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Add product</DialogTitle>
+            <DialogTitle>{editor.editingItemId ? 'Edit product' : 'Add product'}</DialogTitle>
           </DialogHeader>
           <form onSubmit={(e) => void editor.handleAddItem(e)} className="space-y-4">
             <div>
@@ -507,7 +508,30 @@ export default function PromoEditorPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label htmlFor="item-price">Price *</Label>
+                <Label htmlFor="item-rrp">RRP / MSRP</Label>
+                <Input
+                  id="item-rrp"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={editor.itemRrp}
+                  onChange={(e) => editor.setItemRrp(e.target.value)}
+                  placeholder="19.99"
+                />
+              </div>
+              <div>
+                <Label htmlFor="item-unit">Unit</Label>
+                <Input
+                  id="item-unit"
+                  value={editor.itemUnit}
+                  onChange={(e) => editor.setItemUnit(e.target.value)}
+                  placeholder="ea, lf, bd ft"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="item-price">Sale price *</Label>
                 <Input
                   id="item-price"
                   type="number"
@@ -519,12 +543,17 @@ export default function PromoEditorPage() {
                 />
               </div>
               <div>
-                <Label htmlFor="item-unit">Unit</Label>
+                <Label htmlFor="item-discount">Discount %</Label>
                 <Input
-                  id="item-unit"
-                  value={editor.itemUnit}
-                  onChange={(e) => editor.setItemUnit(e.target.value)}
-                  placeholder="ea, lf, bd ft"
+                  id="item-discount"
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="100"
+                  value={editor.itemDiscount}
+                  onChange={(e) => editor.setItemDiscount(e.target.value)}
+                  placeholder="35"
+                  disabled={!editor.itemRrp}
                 />
               </div>
             </div>
@@ -549,7 +578,7 @@ export default function PromoEditorPage() {
                 type="submit"
                 disabled={!editor.itemName.trim() || !editor.itemPrice || editor.addingItem}
               >
-                {editor.addingItem ? 'Adding…' : 'Add product'}
+                {editor.addingItem ? 'Saving…' : editor.editingItemId ? 'Save changes' : 'Add product'}
               </Button>
             </DialogFooter>
           </form>
