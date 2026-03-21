@@ -3,13 +3,15 @@
 import { useState, useRef, KeyboardEvent } from 'react'
 import {
   ChevronDown, ChevronUp, Upload, Plus, Trash2, Link as LinkIcon,
-  Bookmark, BookmarkCheck, GitBranch, DollarSign, Copy, X, Pencil,
+  Bookmark, BookmarkCheck, GitBranch, DollarSign, Copy, X, Pencil, LayoutTemplate,
 } from 'lucide-react'
 import { type Promo, type PromoItem, type ProductSnippet, type Branch, type ImportMapping } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { TemplateSelector } from '@/components/template-selector'
 import { type UploadState, type ScrapeState, type BranchPackState, type CoopSaveState, type CoopReportState, type BranchJobSet } from './use-promo-editor'
 
 // ---------------------------------------------------------------------------
@@ -126,6 +128,10 @@ interface RightPanelProps {
   handleSaveCoopData: () => void
   handleGenerateCoopReport: () => void
   blobDownload: (url: string, filename: string) => void
+
+  // template
+  selectedTemplate: string
+  handleTemplateSelect: (id: string) => void
 
   // duplicate
   duplicate: { mutate: () => void; isPending: boolean }
@@ -247,9 +253,25 @@ export function RightPanel({
   handleSaveCoopData,
   handleGenerateCoopReport,
   blobDownload,
+  selectedTemplate,
+  handleTemplateSelect,
   duplicate,
 }: RightPanelProps) {
   const items = promo.items ?? []
+  const [templateDialogOpen, setTemplateDialogOpen] = useState(false)
+  const [pendingTemplate, setPendingTemplate] = useState(selectedTemplate)
+
+  function openTemplateDialog() {
+    setPendingTemplate(selectedTemplate)
+    setTemplateDialogOpen(true)
+  }
+
+  function confirmTemplateChange() {
+    if (pendingTemplate !== selectedTemplate) {
+      handleTemplateSelect(pendingTemplate)
+    }
+    setTemplateDialogOpen(false)
+  }
 
   return (
     <div className="w-80 shrink-0 border-l border-slate-200 bg-white overflow-y-auto">
@@ -286,6 +308,15 @@ export function RightPanel({
               className="h-8 text-sm"
             />
           </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full text-slate-500 h-7 text-xs"
+            onClick={openTemplateDialog}
+          >
+            <LayoutTemplate className="h-3.5 w-3.5 mr-1.5" />
+            Change template
+          </Button>
           <Button
             variant="ghost"
             size="sm"
@@ -681,6 +712,22 @@ export function RightPanel({
           </div>
         </Section>
       )}
+
+      {/* Change template dialog */}
+      <Dialog open={templateDialogOpen} onOpenChange={setTemplateDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Change template</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto pr-1 mt-1">
+            <TemplateSelector selected={pendingTemplate} onSelect={setPendingTemplate} />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setTemplateDialogOpen(false)}>Cancel</Button>
+            <Button onClick={confirmTemplateChange}>Apply template</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

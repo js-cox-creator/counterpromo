@@ -20,7 +20,6 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { usePromoEditor } from './_components/use-promo-editor'
-import { TemplateStrip } from './_components/template-strip'
 import { RightPanel } from './_components/right-panel'
 
 // ---------------------------------------------------------------------------
@@ -212,14 +211,6 @@ export default function PromoEditorPage() {
         )}
       </div>
 
-      {/* ------------------------------------------------------------------ */}
-      {/* Template strip                                                      */}
-      {/* ------------------------------------------------------------------ */}
-      <TemplateStrip
-        selectedTemplate={editor.selectedTemplate}
-        templateSaving={editor.templateSaving}
-        onTemplateSelect={(id) => void editor.handleTemplateSelect(id)}
-      />
 
       {/* ------------------------------------------------------------------ */}
       {/* Main area: viewport + right panel                                   */}
@@ -534,6 +525,8 @@ export default function PromoEditorPage() {
           handleSaveCoopData={editor.handleSaveCoopData}
           handleGenerateCoopReport={editor.handleGenerateCoopReport}
           blobDownload={editor.blobDownload}
+          selectedTemplate={editor.selectedTemplate}
+          handleTemplateSelect={(id) => void editor.handleTemplateSelect(id)}
           duplicate={{ mutate: () => editor.duplicate.mutate(), isPending: editor.duplicate.isPending }}
         />
       </div>
