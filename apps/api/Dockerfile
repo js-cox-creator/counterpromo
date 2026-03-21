@@ -35,6 +35,7 @@ COPY --from=builder /app/packages/shared/package.json ./packages/shared/
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/apps/api/node_modules ./apps/api/node_modules
+COPY --from=builder /app/apps/api/src/templates/*.hbs ./apps/api/dist/templates/
 
 # Bypass Prisma's OpenSSL auto-detection on Alpine — point directly to the correct engine binary
 ENV PRISMA_QUERY_ENGINE_LIBRARY=/app/packages/db/generated/client/libquery_engine-linux-musl-openssl-3.0.x.so.node

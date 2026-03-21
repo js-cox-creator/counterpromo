@@ -27,6 +27,7 @@ ENV NODE_ENV=production
 WORKDIR /app
 
 COPY --from=builder /app/apps/worker/dist ./apps/worker/dist
+COPY --from=builder /app/apps/worker/src/templates/*.hbs ./apps/worker/dist/templates/
 COPY --from=builder /app/packages/db/dist ./packages/db/dist
 COPY --from=builder /app/packages/db/generated ./packages/db/generated
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist

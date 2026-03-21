@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{{promo.title}}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700;800&family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    @page { size: letter; margin: 0; }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 8.5in;
+      height: 11in;
+      font-family: 'Open Sans', Arial, sans-serif;
+      background: #f2f2f2;
+      color: #262626;
+    }
+
+    .page {
+      width: 8.5in;
+      height: 11in;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: #ffffff;
+      box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* BANNER / HEADER                                                      */
+    /* ------------------------------------------------------------------ */
+
+    .banner {
+      background: {{brand.primaryColor}};
+      color: #ffffff;
+      flex-shrink: 0;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .banner-accent-bar {
+      height: 7px;
+      background: {{brand.secondaryColor}};
+    }
+
+    .banner-inner {
+      padding: 18px 28px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      position: relative;
+    }
+
+    /* Corner triangle accent */
+    .banner-triangle {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 0;
+      height: 0;
+      border-left: 72px solid {{brand.secondaryColor}};
+      border-bottom: 72px solid transparent;
+    }
+
+    .banner-identity {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      position: relative;
+      z-index: 1;
+      padding-left: 10px;
+    }
+
+    .banner-logo {
+      height: 46px;
+      width: auto;
+      object-fit: contain;
+      max-width: 150px;
+    }
+
+    .banner-company {
+      font-family: 'Oswald', Arial, sans-serif;
+      font-size: 22px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #ffffff;
+      line-height: 1.1;
+    }
+
+    .banner-copy {
+      text-align: right;
+    }
+
+    .banner-title {
+      font-family: 'Oswald', Arial, sans-serif;
+      font-size: 38px;
+      font-weight: 800;
+      text-transform: uppercase;
+      color: {{brand.secondaryColor}};
+      line-height: 1.0;
+    }
+
+    .banner-subhead {
+      font-family: 'Open Sans', sans-serif;
+      font-size: 12px;
+      color: rgba(255,255,255,0.75);
+      margin-top: 4px;
+      line-height: 1.3;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* PRODUCTS AREA                                                        */
+    /* ------------------------------------------------------------------ */
+
+    .products-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: #ffffff;
+      padding: 14px 20px;
+      gap: 0;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* ROW DIVIDER                                                          */
+    /* ------------------------------------------------------------------ */
+
+    .row-divider {
+      background: {{brand.secondaryColor}}18;
+      padding: 5px 12px;
+      text-align: center;
+      flex-shrink: 0;
+      margin: 6px 0;
+    }
+
+    .row-divider p {
+      color: #737373;
+      font-size: 10px;
+      font-style: italic;
+      line-height: 1.4;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* PRODUCT ROW                                                          */
+    /* ------------------------------------------------------------------ */
+
+    .product-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      flex: 1;
+      min-height: 0;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* PRODUCT CARD                                                         */
+    /* ------------------------------------------------------------------ */
+
+    .product-card {
+      border: 1px solid #d9d9d9;
+      padding: 12px 10px 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      background: #ffffff;
+      min-height: 0;
+    }
+
+    .product-card.empty {
+      visibility: hidden;
+      border-color: transparent;
+      background: transparent;
+    }
+
+    /* Category tag */
+    .product-category {
+      display: inline-block;
+      font-size: 7.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      color: {{brand.primaryColor}};
+      background: {{brand.primaryColor}}18;
+      border-radius: 2px;
+      padding: 1px 5px;
+      margin-bottom: 6px;
+      font-family: 'Open Sans', sans-serif;
+    }
+
+    /* Image */
+    .product-img-wrap {
+      width: 100%;
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 8px;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .product-img-wrap img {
+      max-height: 100%;
+      max-width: 100%;
+      object-fit: contain;
+    }
+
+    .product-no-img {
+      width: 64px;
+      height: 64px;
+      background: #f0f0f0;
+      border: 1px dashed #cccccc;
+      border-radius: 2px;
+    }
+
+    /* Price */
+    .product-price {
+      display: flex;
+      align-items: baseline;
+      gap: 1px;
+      margin-bottom: 4px;
+    }
+
+    .price-dollars {
+      font-family: 'Oswald', Arial, sans-serif;
+      font-size: 26px;
+      font-weight: 700;
+      color: {{brand.secondaryColor}};
+      line-height: 1;
+    }
+
+    .price-cents {
+      font-family: 'Open Sans', sans-serif;
+      font-size: 12px;
+      font-weight: 700;
+      color: {{brand.secondaryColor}};
+    }
+
+    .price-unit {
+      font-size: 9px;
+      color: #999999;
+      margin-left: 4px;
+      align-self: flex-end;
+      padding-bottom: 2px;
+    }
+
+    /* Name */
+    .product-name {
+      font-family: 'Oswald', Arial, sans-serif;
+      font-weight: 700;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 3px;
+      color: #262626;
+      line-height: 1.2;
+    }
+
+    /* Meta */
+    .product-meta {
+      font-size: 8.5px;
+      color: #737373;
+      line-height: 1.5;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* FOOTER                                                               */
+    /* ------------------------------------------------------------------ */
+
+    .footer {
+      background: {{brand.secondaryColor}};
+      color: #ffffff;
+      padding: 10px 22px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      gap: 16px;
+      min-height: 48px;
+    }
+
+    .footer-brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .footer-logo {
+      height: 26px;
+      width: auto;
+      object-fit: contain;
+      max-width: 90px;
+    }
+
+    .footer-brand-name {
+      font-family: 'Oswald', Arial, sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .footer-contact {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      font-size: 11px;
+      color: rgba(255,255,255,0.9);
+    }
+
+    .footer-contact-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .footer-cta {
+      font-family: 'Oswald', Arial, sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* WATERMARK                                                            */
+    /* ------------------------------------------------------------------ */
+
+    .watermark {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-45deg);
+      font-size: 80px;
+      color: rgba(0,0,0,0.07);
+      font-weight: 900;
+      pointer-events: none;
+      white-space: nowrap;
+      z-index: 999;
+      font-family: 'Oswald', Arial, sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+
+    <!-- HEADER -->
+    <div class="banner">
+      <div class="banner-accent-bar"></div>
+      <div class="banner-inner">
+        <div class="banner-triangle"></div>
+        <div class="banner-identity">
+          {{#if brand.logoUrl}}
+            <img class="banner-logo" src="{{brand.logoUrl}}" alt="{{brand.name}}">
+          {{else}}
+            <span class="banner-company">{{brand.name}}</span>
+          {{/if}}
+        </div>
+        <div class="banner-copy">
+          <p class="banner-title">{{promo.title}}</p>
+          {{#if promo.subhead}}
+            <p class="banner-subhead">{{promo.subhead}}</p>
+          {{/if}}
+        </div>
+      </div>
+    </div>
+
+    <!-- PRODUCTS -->
+    <div class="products-area">
+      {{#eachRow items}}
+        {{#unless isFirst}}
+          <div class="row-divider">
+            <p>{{#if ../promo.subhead}}{{../promo.subhead}}{{else}}{{../brand.name}} — Quality Products{{/if}}</p>
+          </div>
+        {{/unless}}
+        <div class="product-row">
+          {{#each row}}
+            {{#if this}}
+              <div class="product-card">
+                {{#if category}}
+                  <span class="product-category">{{category}}</span>
+                {{/if}}
+                <div class="product-img-wrap">
+                  {{#if imageUrl}}
+                    <img src="{{imageUrl}}" alt="{{name}}">
+                  {{else}}
+                    <div class="product-no-img"></div>
+                  {{/if}}
+                </div>
+                <div class="product-price">
+                  <span class="price-dollars">${{priceWhole price}}</span>
+                  <span class="price-cents">.{{priceCents price}}</span>
+                  {{#if unit}}<span class="price-unit">/ {{unit}}</span>{{/if}}
+                </div>
+                <div class="product-name">{{name}}</div>
+                {{#if vendor}}<div class="product-meta">{{vendor}}</div>{{/if}}
+                {{#if sku}}<div class="product-meta">SKU: {{sku}}</div>{{/if}}
+              </div>
+            {{else}}
+              <div class="product-card empty"></div>
+            {{/if}}
+          {{/each}}
+        </div>
+      {{/eachRow}}
+    </div>
+
+    <!-- FOOTER -->
+    <div class="footer">
+      <div class="footer-brand">
+        {{#if brand.logoUrl}}
+          <img class="footer-logo" src="{{brand.logoUrl}}" alt="{{brand.name}}">
+        {{/if}}
+        <span class="footer-brand-name">{{brand.name}}</span>
+      </div>
+      {{#if branch}}
+        <div class="footer-contact">
+          {{#if branch.phone}}
+            <span class="footer-contact-item">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
+              </svg>
+              {{branch.phone}}
+            </span>
+          {{/if}}
+          {{#if branch.email}}
+            <span class="footer-contact-item">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="2" y1="12" x2="22" y2="12"/>
+                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+              </svg>
+              {{branch.email}}
+            </span>
+          {{/if}}
+          {{#if branch.address}}
+            <span class="footer-contact-item">{{branch.address}}</span>
+          {{/if}}
+        </div>
+      {{/if}}
+      <div class="footer-cta">
+        {{#if branch.cta}}{{branch.cta}}{{else if promo.cta}}{{promo.cta}}{{else}}Contact us today{{/if}}
+      </div>
+    </div>
+
+  </div>
+
+  {{#if watermark}}
+    <div class="watermark">PREVIEW ONLY</div>
+  {{/if}}
+</body>
+</html>

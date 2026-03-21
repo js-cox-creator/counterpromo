@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{promo.title}}</title>
+  <style>
+    @page {
+      size: letter;
+      margin: 0;
+    }
+
+    html, body {
+      width: 8.5in;
+      height: 11in;
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      box-sizing: border-box;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+
+    .page {
+      width: 8.5in;
+      height: 11in;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Header band */
+    .header {
+      background: {{brand.primaryColor}};
+      padding: 20px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-shrink: 0;
+    }
+
+    .header-logo {
+      height: 56px;
+      width: auto;
+      object-fit: contain;
+      flex-shrink: 0;
+    }
+
+    .header-title {
+      color: #ffffff;
+      font-size: 32px;
+      font-weight: 900;
+      margin: 0;
+      line-height: 1.1;
+      letter-spacing: -0.5px;
+    }
+
+    /* Subhead band */
+    .subhead-band {
+      background: {{brand.secondaryColor}};
+      padding: 8px 24px;
+      flex-shrink: 0;
+    }
+
+    .subhead-text {
+      color: #ffffff;
+      font-size: 16px;
+      font-weight: 600;
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    /* Products section */
+    .products-section {
+      flex: 1;
+      padding: 16px 24px;
+      background: #f4f4f4;
+      overflow: hidden;
+    }
+
+    .product-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px;
+    }
+
+    .product-card {
+      background: #ffffff;
+      border-radius: 6px;
+      padding: 16px;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .product-name {
+      font-size: 14px;
+      font-weight: 700;
+      color: #1a1a1a;
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+
+    .product-price-wrapper {
+      text-align: center;
+      margin: 4px 0;
+    }
+
+    .product-price {
+      font-size: 32px;
+      font-weight: 700;
+      color: {{brand.primaryColor}};
+      margin: 0;
+      line-height: 1;
+    }
+
+    .product-unit {
+      font-size: 11px;
+      color: #888888;
+      margin: 4px 0 0 0;
+      text-align: center;
+    }
+
+    .product-sku {
+      font-size: 10px;
+      color: #bbbbbb;
+      margin: 6px 0 0 0;
+    }
+
+    /* Footer */
+    .footer {
+      padding: 20px 24px;
+      text-align: center;
+      background: #ffffff;
+      border-top: 2px solid {{brand.primaryColor}};
+      flex-shrink: 0;
+    }
+
+    .footer-cta {
+      font-size: 18px;
+      font-weight: 700;
+      color: #1a1a1a;
+      margin: 0;
+      letter-spacing: 0.5px;
+    }
+
+    /* Watermark */
+    .watermark {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-45deg);
+      font-size: 80px;
+      color: rgba(0, 0, 0, 0.08);
+      font-weight: 900;
+      pointer-events: none;
+      white-space: nowrap;
+      z-index: 999;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+
+    <!-- Header band -->
+    <div class="header">
+      {{#if brand.logoUrl}}
+        <img class="header-logo" src="{{brand.logoUrl}}" alt="{{brand.name}}">
+      {{/if}}
+      <p class="header-title">{{promo.title}}</p>
+    </div>
+
+    <!-- Subhead band -->
+    {{#if promo.subhead}}
+      <div class="subhead-band">
+        <p class="subhead-text">{{promo.subhead}}</p>
+      </div>
+    {{/if}}
+
+    <!-- Product grid (2 columns) -->
+    <div class="products-section">
+      <div class="product-grid">
+        {{#each items}}
+          <div class="product-card">
+            <p class="product-name">{{name}}</p>
+            <div class="product-price-wrapper">
+              <p class="product-price" style="color:{{../brand.primaryColor}}">{{price}}</p>
+            </div>
+            {{#if unit}}
+              <p class="product-unit">{{unit}}</p>
+            {{/if}}
+            {{#if sku}}
+              <p class="product-sku">SKU: {{sku}}</p>
+            {{/if}}
+          </div>
+        {{/each}}
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <p class="footer-cta">
+        {{#if promo.cta}}{{promo.cta}}{{else}}Contact us today{{/if}}
+      </p>
+    </div>
+
+  </div>
+
+  {{#if watermark}}
+    <div class="watermark">PREVIEW ONLY</div>
+  {{/if}}
+</body>
+</html>

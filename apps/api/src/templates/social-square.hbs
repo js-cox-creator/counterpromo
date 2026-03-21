@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{{promo.title}}</title>
+  <style>
+    html, body {
+      width: 1080px;
+      height: 1080px;
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      box-sizing: border-box;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+
+    .page {
+      width: 1080px;
+      height: 1080px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: #f8f8f8;
+    }
+
+    /* Header band */
+    .header {
+      background: {{brand.primaryColor}};
+      padding: 28px 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .header-logo {
+      height: 56px;
+      width: auto;
+      object-fit: contain;
+    }
+
+    .header-company {
+      color: #ffffff;
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+    }
+
+    /* Title section */
+    .title-section {
+      padding: 32px 40px 24px;
+      background: #ffffff;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    .promo-title {
+      font-size: 48px;
+      font-weight: 900;
+      color: #1a1a1a;
+      margin: 0 0 8px 0;
+      line-height: 1.1;
+    }
+
+    .promo-subhead {
+      font-size: 22px;
+      color: #555555;
+      margin: 0;
+    }
+
+    /* Product grid — 2 columns × 3 rows */
+    .products-section {
+      flex: 1;
+      padding: 20px 40px;
+      overflow: hidden;
+    }
+
+    .product-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+      height: 100%;
+    }
+
+    .product-card {
+      background: #ffffff;
+      border: 2px solid #e8e8e8;
+      border-radius: 12px;
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .product-name {
+      font-size: 18px;
+      font-weight: 700;
+      color: #1a1a1a;
+      margin: 0 0 6px 0;
+      line-height: 1.3;
+    }
+
+    .product-price {
+      font-size: 32px;
+      font-weight: 900;
+      color: {{brand.secondaryColor}};
+      margin: 0 0 4px 0;
+      line-height: 1;
+    }
+
+    .product-unit {
+      font-size: 14px;
+      color: #888888;
+      margin: 0;
+    }
+
+    /* Footer band */
+    .footer {
+      background: {{brand.primaryColor}};
+      padding: 22px 40px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    .footer-cta {
+      color: #ffffff;
+      font-size: 24px;
+      font-weight: 800;
+      margin: 0;
+      letter-spacing: 0.5px;
+    }
+
+    /* Watermark */
+    .watermark {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-45deg);
+      font-size: 100px;
+      color: rgba(0, 0, 0, 0.07);
+      font-weight: 900;
+      pointer-events: none;
+      white-space: nowrap;
+      z-index: 999;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        {{#if brand.logoUrl}}
+          <img class="header-logo" src="{{brand.logoUrl}}" alt="{{brand.name}}">
+        {{else}}
+          <span class="header-company">{{brand.name}}</span>
+        {{/if}}
+      </div>
+      <span class="header-company" style="font-size:20px;opacity:0.85;">{{brand.name}}</span>
+    </div>
+
+    <!-- Title -->
+    <div class="title-section">
+      <p class="promo-title">{{promo.title}}</p>
+      {{#if promo.subhead}}
+        <p class="promo-subhead">{{promo.subhead}}</p>
+      {{/if}}
+    </div>
+
+    <!-- Product grid (max 6 items) -->
+    <div class="products-section">
+      <div class="product-grid">
+        {{#each items}}
+          {{#if @index}}{{else}}{{/if}}
+          <div class="product-card">
+            <p class="product-name">{{name}}</p>
+            <p class="product-price" style="color:{{../brand.secondaryColor}}">{{price}}</p>
+            {{#if unit}}
+              <p class="product-unit">{{unit}}</p>
+            {{/if}}
+          </div>
+        {{/each}}
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <p class="footer-cta">
+        {{#if promo.cta}}{{promo.cta}}{{else}}Contact us today{{/if}}
+      </p>
+    </div>
+
+  </div>
+
+  {{#if watermark}}
+    <div class="watermark">PREVIEW ONLY</div>
+  {{/if}}
+</body>
+</html>

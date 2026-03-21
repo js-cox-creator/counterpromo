@@ -1,7 +1,13 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import * as cheerio from 'cheerio'
+import Handlebars from 'handlebars'
+import { readFileSync, existsSync } from 'fs'
+import { fileURLToPath } from 'url'
+import { dirname, join } from 'path'
 import { prisma } from '@counterpromo/db'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
 import { BillingPlan, JobType, PLAN_LIMITS } from '@counterpromo/shared'
 import { requireAuth } from '../middleware/auth.js'
 import { getUploadPresignedUrl, getAssetSignedUrl } from '../lib/s3.js'
@@ -39,6 +45,29 @@ function injectColor($: cheerio.CheerioAPI, selector: string, prop: string, valu
   })
 }
 
+// Handlebars helpers (mirror worker's render.ts)
+Handlebars.registerHelper('or', (a: unknown, b: unknown) => a || b)
+Handlebars.registerHelper('priceWhole', (price: string) => String(price).replace('$', '').split('.')[0] ?? '0')
+Handlebars.registerHelper('priceCents', (price: string) => String(price).match(/\.(\d{2})/)?.[1] ?? '00')
+Handlebars.registerHelper('eachRow', function(items: unknown[], options: Handlebars.HelperOptions) {
+  if (!Array.isArray(items)) return ''
+  let result = ''
+  const size = 3
+  for (let i = 0; i < items.length; i += size) {
+    const row = items.slice(i, i + size)
+    while (row.length < size) row.push(null)
+    result += (options.fn as (ctx: unknown) => string)({ row, rowIndex: i / size, isFirst: i === 0, isLast: i + size >= items.length })
+  }
+  return result
+})
+
+function renderBuiltinTemplate(templateId: string, data: object): string | null {
+  const templatePath = join(__dirname, '../templates', `${templateId}.hbs`)
+  if (!existsSync(templatePath)) return null
+  const source = readFileSync(templatePath, 'utf8')
+  return Handlebars.compile(source)(data)
+}
+
 async function buildPreviewHtml(promoId: string, accountId: string, branchId?: string): Promise<string | null> {
   const [promo, brandKit, account, branch] = await Promise.all([
     prisma.promo.findFirst({
@@ -50,13 +79,9 @@ async function buildPreviewHtml(promoId: string, accountId: string, branchId?: s
     branchId ? prisma.branch.findFirst({ where: { id: branchId, accountId } }) : Promise.resolve(null),
   ])
 
-  if (!promo?.templateId) return null
+  if (!promo) return null
 
-  const custom = await prisma.customTemplate.findFirst({
-    where: { id: promo.templateId, OR: [{ accountId }, { isSystem: true }] },
-  })
-  if (!custom) return null
-
+  const templateId = promo.templateId ?? 'multi-product'
   const colors = (brandKit?.colors ?? []) as string[]
   const primaryColor = colors[0] ?? '#1a1a2e'
   const secondaryColor = colors[1] ?? '#e94560'
@@ -99,6 +124,16 @@ async function buildPreviewHtml(promoId: string, accountId: string, branchId?: s
     websiteUrl: brandKit?.websiteUrl ?? null,
     aiDescription: brandKit?.aiDescription ?? null,
   }
+
+  // 1. Try built-in Handlebars template
+  const builtinHtml = renderBuiltinTemplate(templateId, { promo: { id: promo.id, title: promo.title, subhead: promo.subhead, cta: promo.cta || branch?.cta || null }, items, brand, branch: branch ? { name: branch.name, address: branch.address, phone: branch.phone, email: branch.email, cta: branch.cta } : undefined, watermark: false })
+  if (builtinHtml !== null) return builtinHtml
+
+  // 2. Try custom template from DB
+  const custom = await prisma.customTemplate.findFirst({
+    where: { id: templateId, OR: [{ accountId }, { isSystem: true }] },
+  })
+  if (!custom) return null
 
   const $ = cheerio.load(custom.htmlContent)
 

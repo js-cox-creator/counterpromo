@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{emailCopy.subject}}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,Helvetica,sans-serif;">
+
+  <!-- Preheader -->
+  {{#if emailCopy.preheader}}
+    <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">
+      {{emailCopy.preheader}}
+    </div>
+  {{/if}}
+
+  <!-- Wrapper -->
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color:#f4f4f4;">
+    <tr>
+      <td align="center" style="padding:20px 0;">
+
+        <!-- Email container -->
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+
+          <!-- Header -->
+          <tr>
+            <td style="background-color:{{brand.primaryColor}};padding:24px 32px;">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td>
+                    {{#if brand.logoUrl}}
+                      <img src="{{brand.logoUrl}}" alt="{{brand.name}}" height="48" style="display:block;height:48px;width:auto;object-fit:contain;">
+                    {{else}}
+                      <span style="color:#ffffff;font-size:22px;font-weight:700;">{{brand.name}}</span>
+                    {{/if}}
+                  </td>
+                  <td align="right">
+                    <span style="color:rgba(255,255,255,0.8);font-size:13px;">{{brand.name}}</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Hero -->
+          <tr>
+            <td style="padding:32px 32px 24px;border-bottom:1px solid #eeeeee;">
+              <h1 style="margin:0 0 8px 0;font-size:28px;font-weight:800;color:#1a1a1a;line-height:1.2;">{{promo.title}}</h1>
+              {{#if emailCopy.preheader}}
+                <p style="margin:0;font-size:16px;color:#666666;line-height:1.5;">{{emailCopy.preheader}}</p>
+              {{else if promo.subhead}}
+                <p style="margin:0;font-size:16px;color:#666666;line-height:1.5;">{{promo.subhead}}</p>
+              {{/if}}
+            </td>
+          </tr>
+
+          <!-- AI body copy -->
+          {{#if emailCopy.bodyHtml}}
+            <tr>
+              <td style="padding:24px 32px;border-bottom:1px solid #eeeeee;">
+                {{{emailCopy.bodyHtml}}}
+              </td>
+            </tr>
+          {{/if}}
+
+          <!-- Product list -->
+          <tr>
+            <td style="padding:24px 32px;">
+              <p style="margin:0 0 16px 0;font-size:14px;font-weight:700;color:#888888;text-transform:uppercase;letter-spacing:1px;">Featured Products</p>
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                {{#each items}}
+                  <tr>
+                    <td style="padding:12px 0;border-bottom:1px solid #f0f0f0;">
+                      <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                        <tr>
+                          <td>
+                            <p style="margin:0 0 2px 0;font-size:15px;font-weight:700;color:#1a1a1a;">{{name}}</p>
+                            {{#if unit}}
+                              <p style="margin:0;font-size:12px;color:#888888;">{{unit}}</p>
+                            {{/if}}
+                          </td>
+                          <td align="right" style="white-space:nowrap;">
+                            <span style="font-size:20px;font-weight:900;color:{{../brand.secondaryColor}};">{{price}}</span>
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                {{/each}}
+              </table>
+            </td>
+          </tr>
+
+          <!-- CTA button -->
+          <tr>
+            <td style="padding:24px 32px 32px;text-align:center;background-color:#fafafa;border-top:1px solid #eeeeee;">
+              <a href="#" style="display:inline-block;padding:14px 36px;background-color:{{brand.primaryColor}};color:#ffffff;font-size:16px;font-weight:700;text-decoration:none;border-radius:6px;letter-spacing:0.5px;">
+                {{#if promo.cta}}{{promo.cta}}{{else}}Shop Now{{/if}}
+              </a>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding:16px 32px;background-color:#f8f8f8;border-top:1px solid #eeeeee;text-align:center;">
+              <p style="margin:0;font-size:12px;color:#aaaaaa;">
+                &copy; {{brand.name}}. You are receiving this because you opted in to our promotions.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+        <!-- /Email container -->
+
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>
