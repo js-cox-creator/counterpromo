@@ -76,7 +76,7 @@ function LiveHtmlPreview({ html }: { html: string }) {
         <iframe
           srcDoc={html}
           style={{ width: TEMPLATE_W, height: TEMPLATE_H, border: 'none', display: 'block' }}
-          sandbox="allow-same-origin"
+          referrerPolicy="no-referrer"
           title="Live preview"
         />
       </div>
